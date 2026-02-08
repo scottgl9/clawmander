@@ -5,8 +5,8 @@ module.exports = function (taskService) {
   const router = express.Router();
 
   router.get('/', (req, res) => {
-    const { status, agentId } = req.query;
-    res.json(taskService.getAll({ status, agentId }));
+    const { status, agentId, agentType } = req.query;
+    res.json(taskService.getAll({ status, agentId, agentType }));
   });
 
   router.get('/stats', (req, res) => {

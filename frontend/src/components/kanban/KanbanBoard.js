@@ -95,7 +95,7 @@ export default function KanbanBoard() {
 
       {tasks.filter((t) => t.status === 'done').length > 0 && (
         <div className="mt-3 text-center">
-          <Link href="/completed">
+          <Link href="/completed/agent">
             <span className="text-xs text-green-400 hover:text-green-300 cursor-pointer transition-colors">
               {tasks.filter((t) => t.status === 'done').length} completed task{tasks.filter((t) => t.status === 'done').length !== 1 ? 's' : ''} &rarr;
             </span>

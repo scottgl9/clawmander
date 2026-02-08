@@ -150,6 +150,46 @@ Official documentation:
 | `heartbeat` | Agent health check | Record heartbeat, update timer |
 | `tick` | Periodic agent ping | Update last-seen timestamp |
 | `health` | System health metrics | Broadcast to dashboard |
+| `start` | Agent run started | Create task (via TaskService), mark agent active |
+| `end` | Agent run completed | Complete matching task, mark agent idle if no remaining work |
+| `error` | Agent run failed | Block matching task with error metadata, mark agent error |
+
+#### Lifecycle Event Details
+
+The `start`, `end`, and `error` events enable automatic task tracking without explicit REST API calls from agents.
+
+**Session Key Parsing**: The collector parses `sessionKey` to detect subagent work:
+- `agent:<id>:<key>` → `agentType: 'main'`
+- `agent:<id>:subagent:<uuid>` → `agentType: 'subagent'`
+
+**`start` event payload**:
+```json
+{
+  "agentId": "whatsapp-agent",
+  "sessionKey": "agent:whatsapp-agent:sess-123",
+  "runId": "run-001",
+  "title": "Process messages"
+}
+```
+
+**`end` event payload**:
+```json
+{
+  "agentId": "whatsapp-agent",
+  "sessionKey": "agent:whatsapp-agent:sess-123",
+  "runId": "run-001"
+}
+```
+
+**`error` event payload**:
+```json
+{
+  "agentId": "whatsapp-agent",
+  "sessionKey": "agent:whatsapp-agent:sess-123",
+  "runId": "run-001",
+  "error": "Connection timeout"
+}
+```
 
 ### Auto-Reconnect
 

@@ -78,6 +78,17 @@ describe('Work Routes - Action Items', () => {
     expect(svc.getAll).toHaveBeenCalledWith('personal');
   });
 
+  test('GET /api/work/action-items/completed returns done items only', async () => {
+    const svc = mockService();
+    svc.getAll.mockReturnValue(allItems);
+    const app = createTestApp(svc);
+    const res = await request(app, '/api/work/action-items/completed');
+
+    expect(res.status).toBe(200);
+    expect(res.body.every((i) => i.done === true)).toBe(true);
+    expect(res.body).toHaveLength(1); // Gym
+  });
+
   test('GET /api/work/action-items/personal returns personal items', async () => {
     const svc = mockService();
     const app = createTestApp(svc);

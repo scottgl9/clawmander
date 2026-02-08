@@ -87,7 +87,7 @@ Response 200: { "success": true }
 
 #### Get All Tasks
 ```
-GET /api/tasks?status=in_progress&agentId=whatsapp-agent
+GET /api/tasks?status=in_progress&agentId=whatsapp-agent&agentType=main
 
 Response 200: [<task objects>]
 ```
@@ -133,6 +133,7 @@ Valid priorities: `low`, `medium`, `high`, `critical`
 | `status` | string | Current task status |
 | `priority` | string | Task priority level |
 | `progress` | number | Completion percentage (0-100) |
+| `agentType` | string | `'main'` (default) or `'subagent'` — auto-detected from session key |
 | `tags` | string[] | Labels for categorization |
 | `metadata` | object | Arbitrary key-value data |
 
@@ -297,6 +298,15 @@ Response 200: [array of action item objects]
 ```
 
 The optional `category` query parameter filters by category. Omit to get all items.
+
+#### Get Completed Action Items
+```
+GET /api/work/action-items/completed
+
+Response 200: [array of action items where done === true]
+```
+
+Returns all action items (across all categories) that have been marked as done.
 
 #### Get Personal Items
 ```
