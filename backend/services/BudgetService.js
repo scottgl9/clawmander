@@ -54,18 +54,21 @@ class BudgetService {
     const totalBudget = categories.reduce((sum, c) => sum + c.budget, 0);
     const totalSpent = categories.reduce((sum, c) => sum + c.spent, 0);
 
+    // Helper to round to 2 decimal places
+    const round2 = (num) => Math.round(num * 100) / 100;
+
     return {
       month: currentMonth,
       monthName: new Date(currentMonth + '-01').toLocaleString('default', { month: 'long', year: 'numeric' }),
-      totalBudget,
-      totalSpent,
-      remaining: totalBudget - totalSpent,
+      totalBudget: round2(totalBudget),
+      totalSpent: round2(totalSpent),
+      remaining: round2(totalBudget - totalSpent),
       categories: categories.map(c => ({
         id: c.id,
         name: c.name,
-        budget: c.budget,
-        spent: c.spent,
-        remaining: c.budget - c.spent,
+        budget: round2(c.budget),
+        spent: round2(c.spent),
+        remaining: round2(c.budget - c.spent),
         percentage: c.budget > 0 ? Math.round((c.spent / c.budget) * 100) : 0,
       })),
     };
@@ -174,6 +177,9 @@ class BudgetService {
     const result = [];
     const now = new Date();
 
+    // Helper to round to 2 decimal places
+    const round2 = (num) => Math.round(num * 100) / 100;
+
     for (let i = months - 1; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthKey = date.toISOString().slice(0, 7);
@@ -186,8 +192,8 @@ class BudgetService {
         month: date.toLocaleString('default', { month: 'short' }),
         monthFull: date.toLocaleString('default', { month: 'long', year: 'numeric' }),
         monthKey,
-        budget: totalBudget,
-        spent: totalSpent,
+        budget: round2(totalBudget),
+        spent: round2(totalSpent),
       });
     }
 
