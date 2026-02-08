@@ -355,3 +355,195 @@ Response 200:
   "sseClients": 2
 }
 ```
+
+---
+
+## Budget Management
+
+### Get Budget Summary
+```
+GET /api/budget/summary?month=2026-02
+
+Response 200:
+{
+  "month": "2026-02",
+  "monthName": "February 2026",
+  "totalBudget": 4000,
+  "totalSpent": 2847.50,
+  "remaining": 1152.50,
+  "categories": [
+    {
+      "id": "uuid",
+      "name": "Housing",
+      "budget": 1200,
+      "spent": 1200,
+      "remaining": 0,
+      "percentage": 100
+    }
+  ]
+}
+```
+
+### Get All Categories
+```
+GET /api/budget/categories?month=2026-02
+
+Response 200: [array of category objects]
+```
+
+### Create Category
+```
+POST /api/budget/categories
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "name": "Entertainment",
+  "budget": 200,
+  "spent": 0,
+  "month": "2026-02"
+}
+
+Response 201: <category object>
+```
+
+### Update Category
+```
+PATCH /api/budget/categories/:id
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "budget": 250,
+  "spent": 87.50
+}
+
+Response 200: <updated category object>
+```
+
+### Delete Category
+```
+DELETE /api/budget/categories/:id
+Authorization: Bearer <token>
+
+Response 200: { "success": true }
+```
+
+### Get All Transactions
+```
+GET /api/budget/transactions?categoryId=uuid&startDate=2026-02-01&endDate=2026-02-28
+
+Response 200: [array of transaction objects]
+```
+
+### Create Transaction
+```
+POST /api/budget/transactions
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "categoryId": "uuid",
+  "amount": 87.43,
+  "description": "Groceries",
+  "date": "2026-02-08T12:00:00Z",
+  "merchant": "Whole Foods",
+  "metadata": {}
+}
+
+Response 201:
+{
+  "id": "uuid",
+  "categoryId": "uuid",
+  "amount": 87.43,
+  "description": "Groceries",
+  "date": "2026-02-08T12:00:00Z",
+  "merchant": "Whole Foods",
+  "metadata": {},
+  "createdAt": "2026-02-08T12:00:00Z"
+}
+```
+
+**Note**: Creating a transaction automatically updates the category's spent amount.
+
+### Update Transaction
+```
+PATCH /api/budget/transactions/:id
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "amount": 95.00,
+  "description": "Updated description"
+}
+
+Response 200: <updated transaction object>
+```
+
+**Note**: Updating amount or categoryId automatically adjusts category spent amounts.
+
+### Delete Transaction
+```
+DELETE /api/budget/transactions/:id
+Authorization: Bearer <token>
+
+Response 200: { "success": true }
+```
+
+**Note**: Deleting a transaction automatically deducts from category spent amount.
+
+### Get Spending Trends
+```
+GET /api/budget/trends?months=6
+
+Response 200:
+[
+  {
+    "month": "Sep",
+    "monthFull": "September 2025",
+    "monthKey": "2025-09",
+    "budget": 4000,
+    "spent": 3250
+  }
+]
+```
+
+---
+
+## OpenClaw Budget Integration
+
+### Example: Sync Budget from Bank API
+
+```bash
+# OpenClaw fetches transactions from bank API
+# Then pushes to Clawmander
+
+# 1. Create categories (one-time)
+curl -X POST http://localhost:3001/api/budget/categories \
+  -H "Authorization: Bearer changeme" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Groceries",
+    "budget": 600,
+    "spent": 0,
+    "month": "2026-02"
+  }'
+
+# 2. Add transactions as they occur
+curl -X POST http://localhost:3001/api/budget/transactions \
+  -H "Authorization: Bearer changeme" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "categoryId": "<category-uuid>",
+    "amount": 87.43,
+    "description": "Weekly groceries",
+    "date": "2026-02-08T14:30:00Z",
+    "merchant": "Whole Foods",
+    "metadata": {
+      "transactionId": "bank-txn-12345",
+      "accountLast4": "1234"
+    }
+  }'
+```
+
+The dashboard will automatically update category spent amounts and show real-time budget progress.

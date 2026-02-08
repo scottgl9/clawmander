@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { href: '/daily', label: 'Daily', icon: 'D' },
   { href: '/weekly', label: 'Weekly', icon: 'W' },
   { href: '/monthly', label: 'Monthly', icon: 'M' },
+  { href: '/budget', label: 'Budget', icon: '$' },
   { href: '/activity', label: 'Activity', icon: 'A' },
 ];
 
