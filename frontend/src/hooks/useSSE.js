@@ -23,6 +23,7 @@ export function useSSE(onEvent) {
     const events = [
       'task.created', 'task.updated', 'task.deleted', 'task.status_changed',
       'agent.status_changed', 'heartbeat.received', 'system.health',
+      'server.status',
     ];
     events.forEach((evt) => {
       es.addEventListener(evt, (e) => {

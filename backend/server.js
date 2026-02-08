@@ -7,6 +7,7 @@ const AgentService = require('./services/AgentService');
 const TaskService = require('./services/TaskService');
 const HeartbeatService = require('./services/HeartbeatService');
 const BudgetService = require('./services/BudgetService');
+const ServerStatusService = require('./services/ServerStatusService');
 const OpenClawCollector = require('./collectors/OpenClawCollector');
 const mountRoutes = require('./routes');
 const { activityLogger } = require('./middleware/logger');
@@ -25,9 +26,10 @@ const agentService = new AgentService(sseManager);
 const taskService = new TaskService(sseManager);
 const heartbeatService = new HeartbeatService(sseManager, agentService);
 const budgetService = new BudgetService(sseManager);
+const serverStatusService = new ServerStatusService(sseManager);
 
 // Routes
-mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, sseManager });
+mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, sseManager, serverStatusService });
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -94,7 +96,7 @@ if (config.testMode) {
 }
 
 // Start OpenClaw collector
-const collector = new OpenClawCollector(agentService, sseManager);
+const collector = new OpenClawCollector(agentService, sseManager, serverStatusService);
 collector.start();
 
 // Start server
