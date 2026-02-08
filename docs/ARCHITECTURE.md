@@ -36,6 +36,7 @@ Technical architecture and design decisions for the Clawmander Dashboard.
 │  │  - TaskService      │◄────────────────┤  - Broadcast    ││
 │  │  - AgentService     │                 │  - Clients      ││
 │  │  - HeartbeatService │                 └─────────────────┘│
+│  │  - ActionItemService│                                    │
 │  └────────────┬────────┘                                     │
 │               │                                              │
 │  ┌────────────▼────────┐                 ┌─────────────────┐│
@@ -137,7 +138,8 @@ backend/
 │   ├── Task.js                 # Task factory
 │   ├── Agent.js                # Agent factory
 │   ├── Heartbeat.js            # Heartbeat factory
-│   └── ActivityLog.js          # Activity log factory
+│   ├── ActivityLog.js          # Activity log factory
+│   └── ActionItem.js           # Action item factory
 ├── routes/
 │   ├── index.js                # Route aggregator
 │   ├── agents.js               # Agent endpoints
@@ -148,6 +150,7 @@ backend/
 │   ├── TaskService.js          # Task business logic
 │   ├── AgentService.js         # Agent business logic
 │   ├── HeartbeatService.js     # Heartbeat logic
+│   ├── ActionItemService.js   # Action item CRUD (personal/work)
 │   └── SSEManager.js           # SSE client management
 ├── storage/
 │   ├── FileStore.js            # Generic JSON storage

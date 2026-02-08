@@ -7,6 +7,7 @@ const AgentService = require('./services/AgentService');
 const TaskService = require('./services/TaskService');
 const HeartbeatService = require('./services/HeartbeatService');
 const BudgetService = require('./services/BudgetService');
+const ActionItemService = require('./services/ActionItemService');
 const ServerStatusService = require('./services/ServerStatusService');
 const OpenClawCollector = require('./collectors/OpenClawCollector');
 const mountRoutes = require('./routes');
@@ -26,10 +27,11 @@ const agentService = new AgentService(sseManager);
 const taskService = new TaskService(sseManager);
 const heartbeatService = new HeartbeatService(sseManager, agentService);
 const budgetService = new BudgetService(sseManager);
+const actionItemService = new ActionItemService(sseManager);
 const serverStatusService = new ServerStatusService(sseManager);
 
 // Routes
-mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, sseManager, serverStatusService });
+mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService });
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -90,6 +92,19 @@ if (config.testMode) {
     ];
     const transactionsStore = new FileStore('budget-transactions.json');
     transactionsStore.write(transactions);
+
+    // Seed action items
+    const { createActionItem } = require('./models/ActionItem');
+    const actionItems = [
+      createActionItem({ title: 'Schedule dentist appointment', description: 'Need to book a cleaning, last visit was over 6 months ago. Call Dr. Rivera at (512) 555-0147.', priority: 'medium', done: false, category: 'personal' }),
+      createActionItem({ title: 'Renew gym membership', description: 'Current membership expires end of month. Check if annual plan discount is still available.', priority: 'low', done: true, category: 'personal' }),
+      createActionItem({ title: 'Call insurance company', description: 'Dispute the claim denial for the Feb visit. Reference claim #INS-2026-4412.', priority: 'high', done: false, category: 'personal' }),
+      createActionItem({ title: 'Review OpenClaw agent configs', description: 'Audit heartbeat intervals and reconnect policies for all active agents. Check for any stale configs.', priority: 'high', done: false, category: 'work' }),
+      createActionItem({ title: 'Update resume for Austin roles', description: 'Add recent Clawmander project experience and update skills section with Node.js/React stack.', priority: 'medium', done: false, category: 'work' }),
+      createActionItem({ title: 'Check Lunchflow budget alerts', description: 'Review the February alert thresholds and verify notification delivery.', priority: 'low', done: true, category: 'work' }),
+    ];
+    const actionItemsStore = new FileStore('action-items.json');
+    actionItemsStore.write(actionItems);
   }
 } else {
   console.log('[Production Mode] Starting with empty data store');

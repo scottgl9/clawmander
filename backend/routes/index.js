@@ -9,7 +9,7 @@ const sseRoutes = require('./sse');
 const serverRoutes = require('./server');
 
 module.exports = function mountRoutes(app, services) {
-  const { taskService, agentService, heartbeatService, budgetService, sseManager, serverStatusService } = services;
+  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService } = services;
 
   app.use('/api/agents', agentsRoutes(agentService, heartbeatService));
 
@@ -23,7 +23,7 @@ module.exports = function mountRoutes(app, services) {
   });
 
   app.use('/api/tasks', tasksRoutes(taskService));
-  app.use('/api/work', workRoutes);
+  app.use('/api/work', workRoutes(actionItemService));
   app.use('/api/budget', budgetRoutes(budgetService));
   app.use('/api/jobs', jobsRoutes);
   app.use('/api/views', viewsRoutes(taskService, agentService));

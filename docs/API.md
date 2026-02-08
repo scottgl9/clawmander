@@ -260,6 +260,104 @@ The SSE stream emits the following events:
 | `agent.status_changed` | `{ agentId, from, to, agent }` | Agent status change |
 | `heartbeat.received` | Heartbeat object | New heartbeat recorded |
 | `system.health` | Health data | System health update |
+| `actionitem.created` | Action item object | New action item created |
+| `actionitem.updated` | Action item object | Action item updated |
+| `actionitem.deleted` | `{ id }` | Action item removed |
+
+---
+
+### Action Items
+
+Action items are organized into `personal` and `work` categories.
+
+#### Get All Action Items
+```
+GET /api/work/action-items?category=personal|work
+
+Response 200: [array of action item objects]
+```
+
+The optional `category` query parameter filters by category. Omit to get all items.
+
+#### Get Personal Items
+```
+GET /api/work/action-items/personal
+
+Response 200:
+[
+  {
+    "id": "uuid",
+    "title": "Schedule dentist appointment",
+    "description": "Need to book a cleaning, last visit was over 6 months ago.",
+    "priority": "medium",
+    "done": false,
+    "category": "personal",
+    "metadata": {},
+    "createdAt": "2026-02-08T00:00:00.000Z",
+    "updatedAt": "2026-02-08T00:00:00.000Z"
+  }
+]
+```
+
+#### Get Work Items
+```
+GET /api/work/action-items/work
+
+Response 200:
+[
+  {
+    "id": "uuid",
+    "title": "Review OpenClaw agent configs",
+    "description": "Audit heartbeat intervals and reconnect policies for all active agents.",
+    "priority": "high",
+    "done": false,
+    "category": "work",
+    "metadata": {},
+    "createdAt": "2026-02-08T00:00:00.000Z",
+    "updatedAt": "2026-02-08T00:00:00.000Z"
+  }
+]
+```
+
+#### Create Action Item
+```
+POST /api/work/action-items
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "title": "Review OpenClaw agent configs",
+  "description": "Audit heartbeat intervals and reconnect policies.",
+  "priority": "high",
+  "category": "work"
+}
+
+Response 201: <action item object>
+```
+
+Valid priorities: `low`, `medium`, `high`
+Valid categories: `personal`, `work`
+
+#### Update Action Item
+```
+PATCH /api/work/action-items/:id
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "done": true
+}
+
+Response 200: <updated action item object>
+```
+
+#### Delete Action Item
+```
+DELETE /api/work/action-items/:id
+Authorization: Bearer <token>
+
+Response 200: { "success": true }
+```
 
 ---
 
@@ -267,7 +365,6 @@ The SSE stream emits the following events:
 
 These return sample data and are ready for future API integration:
 
-- `GET /api/work/action-items` - Action items
 - `GET /api/work/brief` - Daily work brief
 - `GET /api/budget/summary` - Budget summary
 - `GET /api/budget/trends` - Spending trends

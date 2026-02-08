@@ -24,6 +24,8 @@ export const api = {
   },
   work: {
     getActionItems: () => fetchJSON('/api/work/action-items'),
+    getPersonalItems: () => fetchJSON('/api/work/action-items/personal'),
+    getWorkItems: () => fetchJSON('/api/work/action-items/work'),
     getBrief: () => fetchJSON('/api/work/brief'),
   },
   budget: {
