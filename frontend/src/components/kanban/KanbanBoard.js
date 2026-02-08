@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { api } from '../../lib/api';
 import { useSSE } from '../../hooks/useSSE';
 import { KANBAN_COLUMNS } from '../../lib/constants';
@@ -91,6 +92,16 @@ export default function KanbanBoard() {
           />
         ))}
       </div>
+
+      {tasks.filter((t) => t.status === 'done').length > 0 && (
+        <div className="mt-3 text-center">
+          <Link href="/completed">
+            <span className="text-xs text-green-400 hover:text-green-300 cursor-pointer transition-colors">
+              {tasks.filter((t) => t.status === 'done').length} completed task{tasks.filter((t) => t.status === 'done').length !== 1 ? 's' : ''} &rarr;
+            </span>
+          </Link>
+        </div>
+      )}
 
       <TaskDetailModal
         task={selectedTask}

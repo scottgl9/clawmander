@@ -44,10 +44,29 @@ check_service_files() {
     fi
 }
 
+build_project() {
+    print_info "Installing dependencies and building project..."
+
+    # Backend dependencies
+    print_info "Installing backend dependencies..."
+    (cd "$SCRIPT_DIR/backend" && npm install --production)
+    print_success "Backend dependencies installed"
+
+    # Frontend dependencies and build
+    print_info "Installing frontend dependencies..."
+    (cd "$SCRIPT_DIR/frontend" && npm install)
+    print_info "Building frontend..."
+    (cd "$SCRIPT_DIR/frontend" && npm run build)
+    print_success "Frontend built successfully"
+}
+
 install_services() {
     print_info "Installing Clawmander systemd services..."
 
     check_service_files
+
+    # Build everything first
+    build_project
 
     # Create systemd user directory if it doesn't exist
     mkdir -p "$SERVICE_DIR"
@@ -168,7 +187,8 @@ Clawmander Service Management Script
 Usage: $0 <command> [options]
 
 Commands:
-    install         Install and enable systemd services
+    build           Install dependencies and build frontend
+    install         Build project, then install and enable systemd services
     uninstall       Stop, disable, and remove systemd services
     start           Start both backend and frontend services
     stop            Stop both services
@@ -179,7 +199,8 @@ Commands:
     disable-boot    Disable boot-time startup
 
 Examples:
-    $0 install              # Install services
+    $0 build                # Build project only
+    $0 install              # Build + install services
     $0 start                # Start services
     $0 logs backend         # Show backend logs only
     $0 logs                 # Show all logs
@@ -198,6 +219,9 @@ EOF
 
 # Main
 case "${1:-}" in
+    build)
+        build_project
+        ;;
     install)
         install_services
         ;;

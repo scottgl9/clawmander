@@ -88,7 +88,8 @@ frontend/src/
 │   ├── daily.js        # Daily view
 │   ├── weekly.js       # Weekly view
 │   ├── monthly.js      # Monthly view
-│   └── activity.js     # Activity log page
+│   ├── activity.js     # Activity log page
+│   └── completed.js    # Completed tasks archive
 └── styles/
     └── globals.css     # Global styles and theme
 ```

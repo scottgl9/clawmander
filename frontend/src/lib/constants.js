@@ -24,6 +24,5 @@ export const PRIORITY_COLORS = {
 export const KANBAN_COLUMNS = [
   { key: 'queued', label: 'Queued' },
   { key: 'in_progress', label: 'In Progress' },
-  { key: 'done', label: 'Done' },
   { key: 'blocked', label: 'Blocked' },
 ];

@@ -391,7 +391,7 @@ These return sample data and are ready for future API integration:
 - `GET /api/budget/summary` - Budget summary
 - `GET /api/budget/trends` - Spending trends
 - `GET /api/budget/upcoming-bills` - Upcoming bills
-- `GET /api/jobs/recent` - Recent job matches
+- `GET /api/jobs/recent` - Recent job matches (includes `summary` field)
 - `GET /api/views/daily` - Aggregated daily view
 - `GET /api/views/weekly` - Aggregated weekly view
 - `GET /api/views/monthly` - Aggregated monthly view

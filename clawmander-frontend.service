@@ -6,7 +6,7 @@ Requires=clawmander-backend.service
 [Service]
 Type=simple
 WorkingDirectory=%h/sandbox/personal/clawmander/frontend
-ExecStart=/usr/bin/env npm run dev
+ExecStart=/usr/bin/env npm run start
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
