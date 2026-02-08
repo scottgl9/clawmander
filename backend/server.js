@@ -110,8 +110,12 @@ if (config.testMode) {
   console.log('[Production Mode] Starting with empty data store');
 }
 
-// Start OpenClaw collector (disabled due to protocol incompatibility)
-// TODO: OpenClaw Gateway API has changed - need to determine correct v3 handshake parameters
+// Start OpenClaw collector
+// DISABLED: Current Gateway installation rejects all connection attempts
+// Error: "invalid connect params: at /client/mode: must be equal to constant"
+// The Gateway version/config doesn't match documented Protocol v3 spec
+// Token is configured correctly (48 chars), but client.mode validation fails
+// See ISSUES.md for details
 // const collector = new OpenClawCollector(agentService, sseManager, serverStatusService);
 // collector.start();
 
