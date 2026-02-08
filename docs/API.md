@@ -361,11 +361,33 @@ Response 200: { "success": true }
 
 ---
 
+### Daily Brief
+
+#### Get Daily Brief
+```
+GET /api/work/brief
+
+Response 200:
+{
+  "date": "2026-02-08",
+  "summary": "Focus on agent monitoring and dashboard polish.",
+  "priorities": [
+    {
+      "title": "Monitor OpenClaw agents",
+      "details": "Check heartbeat status for all connected agents. Verify reconnect policies are working and review any agents that have gone offline in the last 24 hours."
+    }
+  ],
+  "blockers": []
+}
+```
+
+Each priority includes a short `title` for display and a `details` field with expanded information. The frontend renders priorities as expandable items - clicking a priority reveals its details.
+
+---
+
 ### Placeholder Endpoints
 
 These return sample data and are ready for future API integration:
-
-- `GET /api/work/brief` - Daily work brief
 - `GET /api/budget/summary` - Budget summary
 - `GET /api/budget/trends` - Spending trends
 - `GET /api/budget/upcoming-bills` - Upcoming bills

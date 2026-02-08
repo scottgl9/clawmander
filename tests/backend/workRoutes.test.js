@@ -111,4 +111,20 @@ describe('Work Routes - Action Items', () => {
     expect(res.body).toHaveProperty('priorities');
     expect(res.body).toHaveProperty('blockers');
   });
+
+  test('GET /api/work/brief priorities have title and details', async () => {
+    const svc = mockService();
+    const app = createTestApp(svc);
+    const res = await request(app, '/api/work/brief');
+
+    expect(res.body.priorities.length).toBeGreaterThan(0);
+    for (const p of res.body.priorities) {
+      expect(p).toHaveProperty('title');
+      expect(p).toHaveProperty('details');
+      expect(typeof p.title).toBe('string');
+      expect(typeof p.details).toBe('string');
+      expect(p.title.length).toBeGreaterThan(0);
+      expect(p.details.length).toBeGreaterThan(0);
+    }
+  });
 });
