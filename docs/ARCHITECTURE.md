@@ -176,7 +176,7 @@ backend/
 **3. Storage Layer**
 - Persistence abstraction
 - In-memory caching
-- CRUD operations
+- CRUD operations + predicate lookup (`findBy`)
 - No business logic
 
 **4. Models Layer**
@@ -218,22 +218,30 @@ backend/
 
 ## Data Flow
 
-### Task Creation Flow
+### Task Creation Flow (with Deduplication)
 ```
 OpenClaw → POST /api/agents/tasks
            ↓
         Auth Middleware
            ↓
-        TaskService.create()
+        TaskService.upsert()
            ↓
-    ┌──────┴──────┐
-    ▼             ▼
-FileStore.insert()  SSEManager.broadcast()
-    ↓             ↓
-tasks.json    EventSource (frontend)
-              ↓
-          KanbanBoard updates
+     Match on agentId + sessionKey + runId?
+        ┌──── yes ────┐──── no ────┐
+        ▼             ▼            ▼
+  FileStore.update()  │   FileStore.insert()
+     (200)            │      (201)
+        ▼             ▼            ▼
+  task.updated    SSEManager    task.created
+        └─────────┬────────────────┘
+                  ↓
+          EventSource (frontend)
+                  ↓
+            KanbanBoard updates
 ```
+
+If any dedup key field (`agentId`, `sessionKey`, `runId`) is missing, the
+request falls through to a normal `create()` for backward compatibility.
 
 ### Heartbeat Flow
 ```

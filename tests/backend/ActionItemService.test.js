@@ -17,6 +17,7 @@ describe('ActionItemService', () => {
     mockStore = {
       read: jest.fn().mockReturnValue([]),
       findById: jest.fn(),
+      findBy: jest.fn().mockReturnValue(null),
       insert: jest.fn(),
       update: jest.fn(),
       remove: jest.fn(),
@@ -116,5 +117,58 @@ describe('ActionItemService', () => {
     const result = service.delete('missing');
     expect(result).toBe(false);
     expect(sse.broadcast).not.toHaveBeenCalled();
+  });
+
+  describe('upsert', () => {
+    test('creates new item when no match found', () => {
+      mockStore.findBy.mockReturnValue(null);
+
+      const result = service.upsert({ title: 'New item', category: 'work' });
+
+      expect(result.created).toBe(true);
+      expect(result.item).toHaveProperty('id');
+      expect(result.item.title).toBe('New item');
+      expect(mockStore.insert).toHaveBeenCalled();
+      expect(sse.broadcast).toHaveBeenCalledWith('actionitem.created', result.item);
+    });
+
+    test('updates existing item when title+category match', () => {
+      const existing = { id: 'existing-1', title: 'Buy groceries', category: 'personal', done: false };
+      mockStore.findBy.mockReturnValue(existing);
+      const updated = { ...existing, details: 'milk, eggs', updatedAt: expect.any(String) };
+      mockStore.update.mockReturnValue(updated);
+
+      const result = service.upsert({ title: 'Buy groceries', category: 'personal', details: 'milk, eggs' });
+
+      expect(result.created).toBe(false);
+      expect(mockStore.update).toHaveBeenCalledWith('existing-1', expect.objectContaining({ details: 'milk, eggs' }));
+      expect(sse.broadcast).toHaveBeenCalledWith('actionitem.updated', updated);
+    });
+
+    test('preserves original id and createdAt on update', () => {
+      const existing = { id: 'orig-id', title: 'Test', category: 'work', createdAt: '2026-01-01' };
+      mockStore.findBy.mockReturnValue(existing);
+      mockStore.update.mockReturnValue({ ...existing, priority: 'high', updatedAt: '2026-02-08' });
+
+      const result = service.upsert({ id: 'new-id', title: 'Test', category: 'work', priority: 'high', createdAt: '2026-02-08' });
+
+      expect(result.created).toBe(false);
+      // update should be called with existing id, and new id/createdAt should not be in updates
+      expect(mockStore.update).toHaveBeenCalledWith('orig-id', expect.not.objectContaining({ id: 'new-id', createdAt: '2026-02-08' }));
+    });
+
+    test('creates new item when title is missing', () => {
+      const result = service.upsert({ category: 'work' });
+
+      expect(result.created).toBe(true);
+      expect(mockStore.findBy).not.toHaveBeenCalled();
+    });
+
+    test('creates new item when category is missing', () => {
+      const result = service.upsert({ title: 'Test' });
+
+      expect(result.created).toBe(true);
+      expect(mockStore.findBy).not.toHaveBeenCalled();
+    });
   });
 });

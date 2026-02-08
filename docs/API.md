@@ -42,7 +42,7 @@ Content-Type: application/json
   }
 }
 
-Response 201:
+Response 201 (new task) / 200 (updated existing):
 {
   "id": "uuid",
   "title": "Process incoming messages",
@@ -60,6 +60,8 @@ Response 201:
   "updatedAt": "2025-01-01T00:00:00.000Z"
 }
 ```
+
+**Deduplication**: If `agentId`, `sessionKey`, and `runId` are all provided and match an existing task, the existing task is updated (200) instead of creating a duplicate (201). The original `id` and `createdAt` are preserved. If any of these three fields is missing, a new task is always created.
 
 #### Update Task
 ```
@@ -349,8 +351,10 @@ Content-Type: application/json
   "category": "work"
 }
 
-Response 201: <action item object>
+Response 201 (new item) / 200 (updated existing): <action item object>
 ```
+
+**Deduplication**: If `title` and `category` both match an existing action item, the existing item is updated (200) instead of creating a duplicate (201). The original `id` and `createdAt` are preserved.
 
 Valid priorities: `low`, `medium`, `high`
 Valid categories: `personal`, `work`

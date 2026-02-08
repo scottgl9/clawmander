@@ -60,6 +60,23 @@ class TaskService {
     return updated;
   }
 
+  upsert(data) {
+    const { agentId, sessionKey, runId } = data;
+    if (agentId && sessionKey && runId) {
+      const existing = this.store.findBy(
+        (t) => t.agentId === agentId && t.sessionKey === sessionKey && t.runId === runId
+      );
+      if (existing) {
+        const { id, createdAt, ...rest } = data;
+        const updated = this.store.update(existing.id, rest);
+        this.sse.broadcast('task.updated', updated);
+        return { task: updated, created: false };
+      }
+    }
+    const task = this.create(data);
+    return { task, created: true };
+  }
+
   delete(id) {
     const task = this.store.findById(id);
     if (!task) return false;

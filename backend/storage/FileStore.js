@@ -66,6 +66,10 @@ class FileStore {
     return true;
   }
 
+  findBy(predicate) {
+    return this.read().find(predicate) || null;
+  }
+
   findAll(filterFn) {
     const data = this.read();
     return filterFn ? data.filter(filterFn) : data;
