@@ -31,6 +31,7 @@ Content-Type: application/json
   "task": {
     "title": "Process incoming messages",
     "description": "Handle 5 pending WhatsApp messages",
+    "details": "Check the WhatsApp queue for unread messages from the last 2 hours. Prioritize messages from contacts in the VIP list. For each message, parse intent, draft a response, and log the interaction.",
     "status": "queued",
     "priority": "high",
     "sessionKey": "session-abc123",
@@ -46,6 +47,7 @@ Response 201:
   "id": "uuid",
   "title": "Process incoming messages",
   "description": "Handle 5 pending WhatsApp messages",
+  "details": "Check the WhatsApp queue for unread messages from the last 2 hours. Prioritize messages from contacts in the VIP list. For each message, parse intent, draft a response, and log the interaction.",
   "status": "queued",
   "priority": "high",
   "agentId": "whatsapp-agent",
@@ -118,6 +120,21 @@ blocked --> in_progress
 
 Valid statuses: `queued`, `in_progress`, `done`, `blocked`
 Valid priorities: `low`, `medium`, `high`, `critical`
+
+### Task Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `title` | string | Short task name displayed in lists |
+| `description` | string | Brief summary of what the task involves |
+| `details` | string | **Expanded information shown when a task is clicked** in daily/weekly/monthly views. Use this for context, steps, notes, or any additional info that helps understand the task. |
+| `status` | string | Current task status |
+| `priority` | string | Task priority level |
+| `progress` | number | Completion percentage (0-100) |
+| `tags` | string[] | Labels for categorization |
+| `metadata` | object | Arbitrary key-value data |
+
+The `details` field is designed for rich, descriptive content that agents provide when creating or updating tasks. The dashboard renders tasks as expandable items — clicking a task reveals its `details` (or falls back to `description` if no details are set).
 
 ---
 
@@ -385,6 +402,54 @@ Each priority includes a short `title` for display and a `details` field with ex
 
 ---
 
+### Aggregated Views
+
+Time-based views that aggregate tasks and agents. Each task in the response includes the `details` field — the frontend renders tasks as expandable items where clicking reveals the details.
+
+#### Get Daily View
+```
+GET /api/views/daily
+
+Response 200:
+{
+  "date": "2026-02-08",
+  "tasks": [<task objects with details>],
+  "agents": [<agent objects>],
+  "stats": { "byStatus": {...}, "byPriority": {...}, "total": 10 }
+}
+```
+
+#### Get Weekly View
+```
+GET /api/views/weekly
+
+Response 200:
+{
+  "startDate": "2026-02-01",
+  "endDate": "2026-02-08",
+  "tasks": [<task objects with details>],
+  "agents": [<agent objects>],
+  "stats": {...},
+  "completedThisWeek": 5
+}
+```
+
+#### Get Monthly View
+```
+GET /api/views/monthly
+
+Response 200:
+{
+  "month": "February 2026",
+  "tasks": [<task objects with details>],
+  "agents": [<agent objects>],
+  "stats": {...},
+  "completedThisMonth": 12
+}
+```
+
+---
+
 ### Placeholder Endpoints
 
 These return sample data and are ready for future API integration:
@@ -392,9 +457,6 @@ These return sample data and are ready for future API integration:
 - `GET /api/budget/trends` - Spending trends
 - `GET /api/budget/upcoming-bills` - Upcoming bills
 - `GET /api/jobs/recent` - Recent job matches (includes `summary` field)
-- `GET /api/views/daily` - Aggregated daily view
-- `GET /api/views/weekly` - Aggregated weekly view
-- `GET /api/views/monthly` - Aggregated monthly view
 
 ---
 
@@ -403,11 +465,11 @@ These return sample data and are ready for future API integration:
 ### 1. Agent Creates and Completes a Task
 
 ```bash
-# 1. Create task
+# 1. Create task (include details for expandable view)
 curl -X POST http://localhost:3001/api/agents/tasks \
   -H "Authorization: Bearer changeme" \
   -H "Content-Type: application/json" \
-  -d '{"agentId":"whatsapp-agent","task":{"title":"Send digest","status":"queued","priority":"high"}}'
+  -d '{"agentId":"whatsapp-agent","task":{"title":"Send digest","details":"Compile message activity from the last 24 hours and send a summary digest to all subscribed contacts.","status":"queued","priority":"high"}}'
 
 # 2. Start working (use taskId from response)
 curl -X PATCH http://localhost:3001/api/tasks/<taskId> \

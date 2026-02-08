@@ -4,13 +4,11 @@ import { useAPI } from '../hooks/useAPI';
 import { useSSE } from '../hooks/useSSE';
 import { api } from '../lib/api';
 import { StatusBadge, PriorityBadge } from '../components/shared/Badge';
-import ProgressBar from '../components/shared/ProgressBar';
-import TaskDetailModal from '../components/shared/TaskDetailModal';
 
 export default function DailyView() {
   const connected = useSSE(() => {});
   const { data, loading, error } = useAPI(() => api.views.getDaily());
-  const [selectedTask, setSelectedTask] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
 
   return (
     <Layout connected={connected}>
@@ -36,21 +34,38 @@ export default function DailyView() {
             {/* Today's tasks */}
             <div className="bg-surface rounded-lg p-4 border border-gray-800">
               <h3 className="text-sm font-semibold text-white mb-3">Today&apos;s Tasks</h3>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {data.tasks?.map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0 cursor-pointer hover:bg-surface-light px-2 -mx-2 rounded transition-colors"
-                    onClick={() => setSelectedTask(task)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <StatusBadge status={task.status} />
-                      <span className="text-sm text-gray-300">{task.title}</span>
+                  <div key={task.id}>
+                    <div
+                      className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0 cursor-pointer hover:bg-surface-light px-2 -mx-2 rounded transition-colors"
+                      onClick={() => setExpandedId(expandedId === task.id ? null : task.id)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`text-accent transition-transform text-xs ${expandedId === task.id ? 'rotate-90' : ''}`}>{'>'}</span>
+                        <StatusBadge status={task.status} />
+                        <span className="text-sm text-gray-300">{task.title}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <PriorityBadge priority={task.priority} />
+                        {task.progress > 0 && <span className="text-xs text-gray-500">{task.progress}%</span>}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <PriorityBadge priority={task.priority} />
-                      {task.progress > 0 && <span className="text-xs text-gray-500">{task.progress}%</span>}
-                    </div>
+                    {expandedId === task.id && (
+                      <div className="ml-7 mt-1 mb-2 text-xs border-l border-gray-700 pl-3 space-y-1">
+                        {task.details && <p className="text-gray-300">{task.details}</p>}
+                        {task.description && !task.details && <p className="text-gray-400">{task.description}</p>}
+                        {task.details && task.description && <p className="text-gray-500">{task.description}</p>}
+                        {!task.details && !task.description && <p className="text-gray-600 italic">No details provided</p>}
+                        {task.tags?.length > 0 && (
+                          <div className="flex gap-1 pt-1">
+                            {task.tags.map((tag) => (
+                              <span key={tag} className="px-1.5 py-0.5 bg-gray-800 text-gray-400 rounded text-[10px]">{tag}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
                 {data.tasks?.length === 0 && <p className="text-xs text-gray-600">No tasks for today</p>}
@@ -72,13 +87,6 @@ export default function DailyView() {
             </div>
           </div>
         )}
-
-        <TaskDetailModal
-          task={selectedTask}
-          agent={selectedTask ? data?.agents?.find(a => a.id === selectedTask.agentId) : null}
-          isOpen={!!selectedTask}
-          onClose={() => setSelectedTask(null)}
-        />
       </div>
     </Layout>
   );
