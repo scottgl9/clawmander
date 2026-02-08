@@ -111,13 +111,8 @@ if (config.testMode) {
 }
 
 // Start OpenClaw collector
-// DISABLED: Current Gateway installation rejects all connection attempts
-// Error: "invalid connect params: at /client/mode: must be equal to constant"
-// The Gateway version/config doesn't match documented Protocol v3 spec
-// Token is configured correctly (48 chars), but client.mode validation fails
-// See ISSUES.md for details
-// const collector = new OpenClawCollector(agentService, sseManager, serverStatusService);
-// collector.start();
+const collector = new OpenClawCollector(agentService, sseManager, serverStatusService);
+collector.start();
 
 // Start server
 app.listen(config.port, '0.0.0.0', () => {

@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function JobCard({ job }) {
   const [expanded, setExpanded] = useState(false);
-  const daysAgo = Math.floor((Date.now() - new Date(job.postedDate).getTime()) / 86400000);
+  const [daysAgo, setDaysAgo] = useState('');
+
+  useEffect(() => {
+    setDaysAgo(Math.floor((Date.now() - new Date(job.postedDate).getTime()) / 86400000));
+  }, [job.postedDate]);
 
   return (
     <div
@@ -18,7 +22,7 @@ export default function JobCard({ job }) {
           <span className={`text-xs font-semibold ${job.matchScore >= 90 ? 'text-green-400' : job.matchScore >= 80 ? 'text-blue-400' : 'text-gray-400'}`}>
             {job.matchScore}%
           </span>
-          <span className="text-[10px] text-gray-600">{daysAgo}d ago</span>
+          <span className="text-[10px] text-gray-600">{daysAgo !== '' ? `${daysAgo}d ago` : ''}</span>
         </div>
       </div>
       {expanded && (

@@ -426,6 +426,27 @@ OPENCLAW_WS_URL=ws://127.0.0.1:18789  # Correct
 # Not: http://127.0.0.1:18789           # Wrong
 ```
 
+**Check handshake logs**:
+```bash
+# Healthy handshake sequence:
+# [OpenClaw] Connected, waiting for challenge...
+# [OpenClaw] Received challenge, responding with connect frame...
+#   (or: [OpenClaw] No challenge received, sending connect frame...)
+# [OpenClaw] Handshake accepted
+
+# If you see "[OpenClaw] Connect rejected:" check the error message:
+# - AUTH_FAILED / invalid token → wrong OPENCLAW_TOKEN in .env
+# - device identity required → missing OPENCLAW_TOKEN
+# - invalid connect params → protocol version mismatch
+```
+
+**Check token is configured**:
+```bash
+cd backend
+node -e "require('dotenv').config(); console.log('Token set:', !!process.env.OPENCLAW_TOKEN)"
+# Should output: Token set: true
+```
+
 **Test connection**:
 ```bash
 # Install wscat if needed
