@@ -220,17 +220,18 @@ class OpenClawCollector {
 
     this.sse.broadcast('system.health', { openClaw: 'connected' });
 
-    // Gateway response may nest server info in msg.server or at top level
+    // Gateway nests most data inside msg.snapshot; server info is at msg.server
     const server = msg.server || {};
+    const snapshot = msg.snapshot || {};
     if (this.serverStatus) {
       this.serverStatus.update({
         connection: 'connected',
         connectedAt: now,
         serverVersion: server.version || msg.serverVersion || null,
         serverHost: server.host || msg.serverHost || null,
-        uptimeMs: msg.uptimeMs || null,
-        sessionDefaults: msg.sessionDefaults || null,
-        presence: msg.presence || [],
+        uptimeMs: snapshot.uptimeMs || msg.uptimeMs || null,
+        sessionDefaults: snapshot.sessionDefaults || msg.sessionDefaults || null,
+        presence: snapshot.presence || msg.presence || [],
       });
     }
 
@@ -246,7 +247,7 @@ class OpenClawCollector {
         console.error('[OpenClaw] Response error:', msg.error.code, msg.error.message);
         entry.reject(new Error(msg.error.message || 'RPC error'));
       } else {
-        entry.resolve(msg.result);
+        entry.resolve(msg.payload || msg.result);
       }
     }
   }
@@ -321,8 +322,8 @@ class OpenClawCollector {
 
       const updates = { lastStatusFetch: new Date().toISOString() };
 
-      if (statusResult.status === 'fulfilled') {
-        updates.statusSummary = statusResult.value;
+      if (statusResult.status === 'fulfilled' && statusResult.value) {
+        updates.statusSummary = this._normalizeStatus(statusResult.value);
       }
       if (presenceResult.status === 'fulfilled') {
         updates.presence = presenceResult.value || [];
@@ -337,6 +338,40 @@ class OpenClawCollector {
     } catch (err) {
       console.error('[OpenClaw] Periodic fetch error:', err.message);
     }
+  }
+
+  // Normalize the Gateway's status response into the shape the frontend expects
+  _normalizeStatus(raw) {
+    const result = { ...raw };
+
+    // heartbeat.agents: Gateway returns array, frontend expects object keyed by agentId
+    if (raw.heartbeat && Array.isArray(raw.heartbeat.agents)) {
+      const agentsObj = {};
+      for (const agent of raw.heartbeat.agents) {
+        agentsObj[agent.agentId] = {
+          enabled: agent.enabled,
+          interval: agent.everyMs ? agent.everyMs / 1000 : null,
+          every: agent.every,
+        };
+      }
+      result.heartbeat = { ...raw.heartbeat, agents: agentsObj };
+    }
+
+    // sessions: Gateway has sessions.defaults.model, frontend expects sessions.defaultModel
+    if (raw.sessions) {
+      result.sessions = {
+        ...raw.sessions,
+        total: raw.sessions.total ?? raw.sessions.count,
+        defaultModel: raw.sessions.defaultModel || raw.sessions.defaults?.model || null,
+      };
+    }
+
+    // channelSummary: Gateway returns array of strings, frontend expects object with count
+    if (Array.isArray(raw.channelSummary)) {
+      result.channelSummary = { count: raw.channelSummary.length, items: raw.channelSummary };
+    }
+
+    return result;
   }
 }
 

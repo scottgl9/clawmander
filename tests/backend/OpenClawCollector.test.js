@@ -101,7 +101,16 @@ describe('OpenClawCollector', () => {
       type: 'res',
       id: connectFrame.id,
       ok: true,
-      payload: { type: 'hello-ok', protocol: 3, server: { version: '3.0.0', host: 'test-host' } },
+      payload: {
+        type: 'hello-ok',
+        protocol: 3,
+        server: { version: '3.0.0', host: 'test-host' },
+        snapshot: {
+          uptimeMs: 12345,
+          sessionDefaults: { defaultAgentId: 'main' },
+          presence: [{ host: 'test-host', platform: 'linux', mode: 'gateway' }],
+        },
+      },
     }));
   }
 
@@ -195,6 +204,10 @@ describe('OpenClawCollector', () => {
         expect.objectContaining({
           connection: 'connected',
           serverVersion: '3.0.0',
+          serverHost: 'test-host',
+          uptimeMs: 12345,
+          sessionDefaults: { defaultAgentId: 'main' },
+          presence: [{ host: 'test-host', platform: 'linux', mode: 'gateway' }],
         })
       );
     });
@@ -269,7 +282,8 @@ describe('OpenClawCollector', () => {
       ws.emit('message', JSON.stringify({
         type: 'res',
         id: reqFrame.id,
-        result: { sessions: { total: 5 } },
+        ok: true,
+        payload: { sessions: { total: 5 } },
       }));
 
       const result = await promise;
