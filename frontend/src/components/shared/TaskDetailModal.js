@@ -18,6 +18,9 @@ export default function TaskDetailModal({ task, agent, isOpen, onClose }) {
             <h3 className="text-xl font-semibold text-white">{task.title}</h3>
             <StatusBadge status={task.status} />
           </div>
+          {task.details && (
+            <p className="text-sm text-gray-300">{task.details}</p>
+          )}
           {task.description && (
             <p className="text-sm text-gray-400">{task.description}</p>
           )}

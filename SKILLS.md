@@ -89,6 +89,7 @@ POST /api/agents/tasks
   "task": {
     "title": "Process incoming messages",
     "description": "Handle 5 pending messages",
+    "details": "Check the message queue for unread items from the last 2 hours. Prioritize VIP contacts. For each message, parse intent, draft a response, and log the interaction.",
     "status": "queued",
     "priority": "high",
     "tags": ["messaging"],
@@ -98,6 +99,8 @@ POST /api/agents/tasks
 ```
 
 Returns `201` with the created task including its `id`.
+
+**Important**: Always include a `details` field with expanded context about the task. The dashboard renders tasks as expandable items — clicking a task reveals its `details`. Use `title` for the short label, `description` for a brief summary, and `details` for the full context (steps involved, relevant notes, acceptance criteria, etc.).
 
 ### Update a Task
 
@@ -153,6 +156,18 @@ blocked --> in_progress
 **Statuses**: `queued`, `in_progress`, `done`, `blocked`
 **Priorities**: `low`, `medium`, `high`, `critical`
 
+### Task Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `title` | Yes | Short task name for list display |
+| `description` | No | Brief summary |
+| `details` | **Recommended** | Expanded info shown when the user clicks a task in the dashboard. Include context, steps, notes, or acceptance criteria. |
+| `status` | No | Default: `queued` |
+| `priority` | No | Default: `medium` |
+| `tags` | No | Array of labels |
+| `metadata` | No | Arbitrary key-value data |
+
 ---
 
 ## Skill: Full Task Lifecycle
@@ -160,11 +175,11 @@ blocked --> in_progress
 A complete example of creating, working on, and completing a task:
 
 ```bash
-# 1. Create
+# 1. Create (always include details for the expandable view)
 curl -X POST http://localhost:3001/api/agents/tasks \
   -H "Authorization: Bearer changeme" \
   -H "Content-Type: application/json" \
-  -d '{"agentId":"my-agent","task":{"title":"Send digest","status":"queued","priority":"high"}}'
+  -d '{"agentId":"my-agent","task":{"title":"Send digest","details":"Compile message activity from the last 24 hours and send a summary digest to all subscribed contacts.","status":"queued","priority":"high"}}'
 # Note the "id" from the response
 
 # 2. Start working
@@ -357,7 +372,7 @@ GET /api/server/status          # Server + OpenClaw connection status
 
 ## Skill: Get Aggregated Views
 
-Pre-built time-based views for dashboard consumption:
+Pre-built time-based views for dashboard consumption. Tasks in these responses include the `details` field, which the frontend renders as expandable items — clicking a task reveals its details.
 
 ```
 GET /api/views/daily            # Today's tasks and stats
