@@ -121,17 +121,12 @@ class OpenClawCollector {
         id: 'cli',
         version: '1.0.0',
         platform: process.platform,
-        mode: 'operator',
+        mode: 'cli',
       },
       role: 'operator',
       scopes: ['operator.read'],
       auth: { token: config.openClaw.token || '' },
     };
-
-    // Include challenge nonce if the Gateway sent one
-    if (challenge && challenge.nonce) {
-      params.client.nonce = challenge.nonce;
-    }
 
     this._sendRaw({ type: 'req', id, method: 'connect', params });
   }
@@ -184,15 +179,18 @@ class OpenClawCollector {
 
   _handleMessage(msg) {
     // Handle pre-connect challenge (first message before handshake)
-    if (!this._handshakeComplete && !this._connectReqId && msg.type === 'challenge') {
-      this._handleChallenge(msg);
+    // Gateway sends: {type: "event", event: "connect.challenge", payload: {nonce, ts}}
+    if (!this._handshakeComplete && !this._connectReqId &&
+        msg.type === 'event' && msg.event === 'connect.challenge') {
+      this._handleChallenge(msg.payload || msg);
       return;
     }
 
     // Handle connect response: Gateway wraps hello-ok inside a res message
+    // Response format: {type: "res", id, ok: true, payload: {type: "hello-ok", protocol, server, ...}}
     if (!this._handshakeComplete && msg.type === 'res' && msg.id === this._connectReqId) {
-      if (msg.ok === true || (!msg.error && msg.result)) {
-        this._handleHelloOk(msg.result || msg.payload || msg);
+      if (msg.ok === true) {
+        this._handleHelloOk(msg.payload || msg.result || msg);
       } else if (msg.error) {
         console.error('[OpenClaw] Connect rejected:', msg.error.code, msg.error.message);
       }
@@ -222,12 +220,14 @@ class OpenClawCollector {
 
     this.sse.broadcast('system.health', { openClaw: 'connected' });
 
+    // Gateway response may nest server info in msg.server or at top level
+    const server = msg.server || {};
     if (this.serverStatus) {
       this.serverStatus.update({
         connection: 'connected',
         connectedAt: now,
-        serverVersion: msg.serverVersion || null,
-        serverHost: msg.serverHost || null,
+        serverVersion: server.version || msg.serverVersion || null,
+        serverHost: server.host || msg.serverHost || null,
         uptimeMs: msg.uptimeMs || null,
         sessionDefaults: msg.sessionDefaults || null,
         presence: msg.presence || [],
