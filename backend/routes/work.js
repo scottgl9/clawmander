@@ -29,6 +29,11 @@ module.exports = function (actionItemService) {
     res.json(items);
   });
 
+  router.get('/action-items/completed', (req, res) => {
+    const items = actionItemService.getAll().filter((item) => item.done === true);
+    res.json(items);
+  });
+
   router.get('/action-items/personal', (req, res) => {
     const limit = req.query.limit ? parseInt(req.query.limit, 10) : 15;
     const items = actionItemService.getPersonal();

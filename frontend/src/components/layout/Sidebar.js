@@ -13,6 +13,15 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: '/agents',
+    label: 'Agents',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z" />
+      </svg>
+    ),
+  },
+  {
     href: '/daily',
     label: 'Daily',
     icon: (
@@ -58,11 +67,20 @@ const NAV_ITEMS = [
     ),
   },
   {
-    href: '/completed',
-    label: 'Completed',
+    href: '/completed/agent',
+    label: 'Agent Done',
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  {
+    href: '/completed/mine',
+    label: 'My Done',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15a2.25 2.25 0 011.65 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 .624.063 1.476 1.026 1.476 2.161V18a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 18V6.108c0-1.135.845-2.098 1.476-2.161.374-.03.748-.057 1.124-.08M15.75 9l-4.5 4.5-2.25-2.25" />
       </svg>
     ),
   },
@@ -121,7 +139,7 @@ export default function Sidebar() {
     >
       <nav className="flex-1 flex flex-col gap-1 px-2">
         {NAV_ITEMS.map(({ href, label, icon }) => {
-          const active = router.pathname === href;
+          const active = href === '/' ? router.pathname === '/' : router.pathname.startsWith(href);
           return (
             <Link key={href} href={href} className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium cursor-pointer transition-colors whitespace-nowrap ${
                 active

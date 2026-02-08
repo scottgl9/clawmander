@@ -11,6 +11,7 @@ class TaskService {
     return this.store.findAll((task) => {
       if (filters.status && task.status !== filters.status) return false;
       if (filters.agentId && task.agentId !== filters.agentId) return false;
+      if (filters.agentType && task.agentType !== filters.agentType) return false;
       return true;
     });
   }

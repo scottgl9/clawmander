@@ -26,3 +26,13 @@ export const KANBAN_COLUMNS = [
   { key: 'in_progress', label: 'In Progress' },
   { key: 'blocked', label: 'Blocked' },
 ];
+
+export const AGENT_TYPES = {
+  MAIN: 'main',
+  SUBAGENT: 'subagent',
+};
+
+export const AGENT_TYPE_COLORS = {
+  main: '#3b82f6',
+  subagent: '#a855f7',
+};
