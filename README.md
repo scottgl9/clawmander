@@ -1,10 +1,14 @@
 # Clawmander Dashboard
 
-**Your personal command center for life, work, and AI agents.**
+**Your personal command center for AI agents, work, and finances.**
+
+Clawmander provides full visibility into [OpenClaw](https://github.com/scottgl9/openclaw) agents with real-time task monitoring, heartbeat tracking, and an intuitive Kanban interface.
+
+![Dashboard](https://img.shields.io/badge/status-active-success) ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ## Overview
 
-Clawmander is a comprehensive dashboard that aggregates data from OpenClaw, your workspace, financial APIs, and job search systems into a unified view.
+A real-time dashboard that aggregates data from OpenClaw, workspace files, financial APIs, and job search systems into a unified view. Built with Next.js and Express, optimized for single-user deployment.
 
 ## Features
 
@@ -72,145 +76,107 @@ clawmander/
 
 ## Tech Stack
 
-- **Backend**: Node.js + Express
-- **Frontend**: React + Next.js
-- **Charts**: Chart.js or Recharts
-- **Styling**: Tailwind CSS
-- **Updates**: Server-Sent Events (SSE) for real-time updates
+- **Backend**: Node.js 18+ • Express • WebSocket (ws) • SSE
+- **Frontend**: Next.js 14 • React 18 • Tailwind CSS • Recharts
+- **Storage**: JSON files with in-memory cache
+- **Real-time**: Server-Sent Events (SSE)
 
-## Installation
+## Quick Start
 
 ```bash
-cd ~/sandbox/personal/clawmander
-
-# Install backend dependencies
+# Clone and install
+git clone git@github.com:scottgl9/clawmander.git
+cd clawmander
 cd backend && npm install
-
-# Install frontend dependencies
 cd ../frontend && npm install
 
-# Start backend
-cd ../backend && npm start
+# Configure
+cd ../backend && cp .env.example .env
+# Edit .env with your settings
 
-# Start frontend (in another terminal)
-cd ../frontend && npm run dev
+# Run (development)
+cd backend && npm start        # Terminal 1 - Backend on :3001
+cd frontend && npm run dev     # Terminal 2 - Frontend on :3000
+
+# Or use systemd services (Linux)
+./service.sh install && ./service.sh start
 ```
 
-## API Endpoints
+**Access**: http://localhost:3000
 
-### Agent Status
-- `GET /api/agents/status` - Current agent status
-- `GET /api/agents/heartbeat` - Next heartbeat info
+## Key Features
 
-### Work
-- `GET /api/work/action-items` - Current action items
-- `GET /api/work/brief` - Current work brief
-- `GET /api/work/jira` - Jira ticket status
+- ✅ **Real-time Kanban Board** - Live task updates via SSE
+- ✅ **Heartbeat Monitoring** - Countdown timers with color-coded alerts
+- ✅ **Agent Status Tracking** - Visual indicators for agent health
+- ✅ **Task Progress Bars** - Live progress updates
+- ✅ **Time Views** - Daily, Weekly, Monthly perspectives
+- ✅ **Activity Audit Log** - Security trail of all API calls
+- ✅ **Budget & Jobs Widgets** - Integrated work/life dashboard
+- ✅ **OpenClaw Integration** - WebSocket collector with auto-reconnect
 
-### Budget
-- `GET /api/budget/summary` - Current month summary
-- `GET /api/budget/trends?months=6` - 6-month trends
-- `GET /api/budget/upcoming-bills` - Bills due soon
+## Documentation
 
-### Jobs
-- `GET /api/jobs/recent` - Recent job matches
-- `GET /api/jobs/applied` - Application tracking
+📚 **Complete documentation available in `/docs`:**
 
-### Views
-- `GET /api/views/daily` - Daily view data
-- `GET /api/views/weekly` - Weekly view data
-- `GET /api/views/monthly` - Monthly view data
+- **[Setup Guide](docs/SETUP.md)** - Detailed installation and configuration
+- **[Architecture](docs/ARCHITECTURE.md)** - System design and tech decisions
+- **[Development](docs/DEVELOPMENT.md)** - Contributing and extending
+- **[API Reference](docs/API.md)** - Complete endpoint documentation
+- **[OpenClaw Integration](docs/OPENCLAW_INTEGRATION.md)** - How to connect agents
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
 
-### Activity
-- `GET /api/activity/log?limit=100` - Recent activity
-- `POST /api/activity/log` - Log new activity
+## Service Management (Linux)
 
-## Configuration
-
-Create `.env` files:
-
-**backend/.env**:
-```
-PORT=3001
-LUNCHFLOW_API_KEY=your_key_here
-OPENCLAW_WORKSPACE=/home/scottgl/.openclaw/workspace
-NODE_ENV=development
-```
-
-**frontend/.env**:
-```
-NEXT_PUBLIC_API_URL=http://localhost:3001
-```
-
-## Auto-Update Mechanism
-
-Dashboard updates automatically on each heartbeat via:
-1. Backend polls OpenClaw data sources every 30 seconds
-2. Frontend subscribes to SSE stream for real-time updates
-3. No AI required - pure data aggregation
-
-## Security
-
-- Activity log tracks all API calls
-- CORS restricted to localhost
-- API key validation for sensitive endpoints
-- Read-only access to OpenClaw data
-
-## Running as a Service (Linux)
-
-For production deployment, use the included systemd service management script:
+Run Clawmander as systemd user services for production:
 
 ```bash
-# Install services (one-time setup)
-./service.sh install
-
-# Start services
-./service.sh start
-
-# Check status
-./service.sh status
-
-# View logs
-./service.sh logs              # Both services
-./service.sh logs backend      # Backend only
-./service.sh logs frontend     # Frontend only
-
-# Enable auto-start on boot
-./service.sh enable-boot
-
-# Stop services
-./service.sh stop
-
-# Restart services
-./service.sh restart
-
-# Uninstall services
-./service.sh uninstall
+./service.sh install      # One-time setup
+./service.sh start        # Start services
+./service.sh status       # Check status
+./service.sh logs         # View logs
+./service.sh enable-boot  # Auto-start on boot
 ```
 
-**Services:**
-- `clawmander-backend.service` - Backend API (port 3001)
-- `clawmander-frontend.service` - Frontend dashboard (port 3000)
+See [Setup Guide](docs/SETUP.md) for details.
 
-Services are installed to `~/.config/systemd/user/` and run as user services.
+## API Quick Reference
 
-## Development
+**Read Endpoints** (no auth):
+- `GET /api/agents/status` - Agent statuses
+- `GET /api/tasks` - All tasks
+- `GET /api/tasks/stats` - Task statistics
+- `GET /api/views/daily` - Daily view
 
-```bash
-# Run backend in watch mode
-cd backend && npm run dev
+**Write Endpoints** (Bearer token required):
+- `POST /api/agents/tasks` - Create task
+- `PATCH /api/tasks/:id` - Update task
+- `POST /api/agents/heartbeat` - Report heartbeat
 
-# Run frontend in dev mode
-cd frontend && npm run dev
-```
+**SSE Stream**:
+- `GET /api/sse/subscribe` - Real-time event stream
 
-Dashboard will be available at `http://localhost:3000`
+Full API documentation: [docs/API.md](docs/API.md)
 
-## Future Enhancements
+## OpenClaw Integration
 
-- Mobile responsive design
-- Dark/light theme toggle
-- Customizable widgets
-- Export reports (PDF/CSV)
-- Alert notifications
-- Multi-user support (for Vanessa)
+Clawmander connects to OpenClaw in two ways:
+
+1. **WebSocket** (`ws://127.0.0.1:18789`) - Backend listens for agent events
+2. **REST API** - OpenClaw agents push tasks and heartbeats
+
+See [OpenClaw Integration Guide](docs/OPENCLAW_INTEGRATION.md) for implementation examples.
+
+## Contributing
+
+Contributions welcome! See [Development Guide](docs/DEVELOPMENT.md) for setup and guidelines.
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/scottgl9/clawmander/issues)
+- **Docs**: See `/docs` directory
+- **Troubleshooting**: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
