@@ -94,7 +94,10 @@ cd ../frontend && npm install
 cd ../backend && cp .env.example .env
 # Edit .env with your settings
 
-# Run (development)
+# Run in TEST MODE (with sample data)
+./start-test.sh
+
+# Or run in PRODUCTION MODE (empty dashboard)
 cd backend && npm start        # Terminal 1 - Backend on :3001
 cd frontend && npm run dev     # Terminal 2 - Frontend on :3000
 
@@ -103,6 +106,11 @@ cd frontend && npm run dev     # Terminal 2 - Frontend on :3000
 ```
 
 **Access**: http://localhost:3000
+
+### Test Mode vs Production Mode
+
+- **Test Mode** (`TEST_MODE=true`): Starts with 4 sample agents and 6 sample tasks
+- **Production Mode** (`TEST_MODE=false`): Starts with empty dashboard, ready for real data
 
 ## Key Features
 
