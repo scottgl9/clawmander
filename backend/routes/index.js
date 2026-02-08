@@ -8,7 +8,7 @@ const activityRoutes = require('./activity');
 const sseRoutes = require('./sse');
 
 module.exports = function mountRoutes(app, services) {
-  const { taskService, agentService, heartbeatService, sseManager } = services;
+  const { taskService, agentService, heartbeatService, budgetService, sseManager } = services;
 
   app.use('/api/agents', agentsRoutes(agentService, heartbeatService));
 
@@ -23,7 +23,7 @@ module.exports = function mountRoutes(app, services) {
 
   app.use('/api/tasks', tasksRoutes(taskService));
   app.use('/api/work', workRoutes);
-  app.use('/api/budget', budgetRoutes);
+  app.use('/api/budget', budgetRoutes(budgetService));
   app.use('/api/jobs', jobsRoutes);
   app.use('/api/views', viewsRoutes(taskService, agentService));
   app.use('/api/activity', activityRoutes);

@@ -6,6 +6,7 @@ const SSEManager = require('./services/SSEManager');
 const AgentService = require('./services/AgentService');
 const TaskService = require('./services/TaskService');
 const HeartbeatService = require('./services/HeartbeatService');
+const BudgetService = require('./services/BudgetService');
 const OpenClawCollector = require('./collectors/OpenClawCollector');
 const mountRoutes = require('./routes');
 const { activityLogger } = require('./middleware/logger');
@@ -23,9 +24,10 @@ const sseManager = new SSEManager();
 const agentService = new AgentService(sseManager);
 const taskService = new TaskService(sseManager);
 const heartbeatService = new HeartbeatService(sseManager, agentService);
+const budgetService = new BudgetService(sseManager);
 
 // Routes
-mountRoutes(app, { taskService, agentService, heartbeatService, sseManager });
+mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, sseManager });
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -60,6 +62,32 @@ if (config.testMode) {
     ];
     const taskStore = new FileStore('tasks.json');
     taskStore.write(tasks);
+
+    // Seed budget data
+    const { createBudgetCategory } = require('./models/BudgetCategory');
+    const { createTransaction } = require('./models/Transaction');
+    const currentMonth = new Date().toISOString().slice(0, 7);
+
+    const budgetCategories = [
+      createBudgetCategory({ name: 'Housing', budget: 1200, spent: 1200, month: currentMonth }),
+      createBudgetCategory({ name: 'Food', budget: 600, spent: 487.30, month: currentMonth }),
+      createBudgetCategory({ name: 'Transport', budget: 300, spent: 215.00, month: currentMonth }),
+      createBudgetCategory({ name: 'Subscriptions', budget: 100, spent: 89.99, month: currentMonth }),
+      createBudgetCategory({ name: 'Other', budget: 1800, spent: 855.21, month: currentMonth }),
+    ];
+    const budgetCategoriesStore = new FileStore('budget-categories.json');
+    budgetCategoriesStore.write(budgetCategories);
+
+    // Sample transactions
+    const transactions = [
+      createTransaction({ categoryId: budgetCategories[0].id, amount: 1200, description: 'Monthly Rent', date: new Date(Date.now() - 7 * 86400000).toISOString(), merchant: 'Landlord' }),
+      createTransaction({ categoryId: budgetCategories[1].id, amount: 87.43, description: 'Groceries', date: new Date(Date.now() - 1 * 86400000).toISOString(), merchant: 'Whole Foods' }),
+      createTransaction({ categoryId: budgetCategories[1].id, amount: 12.50, description: 'Coffee', date: new Date(Date.now() - 2 * 86400000).toISOString(), merchant: 'Starbucks' }),
+      createTransaction({ categoryId: budgetCategories[2].id, amount: 52.00, description: 'Gas', date: new Date(Date.now() - 3 * 86400000).toISOString(), merchant: 'Shell' }),
+      createTransaction({ categoryId: budgetCategories[3].id, amount: 15.99, description: 'Streaming', date: new Date(Date.now() - 10 * 86400000).toISOString(), merchant: 'Netflix' }),
+    ];
+    const transactionsStore = new FileStore('budget-transactions.json');
+    transactionsStore.write(transactions);
   }
 } else {
   console.log('[Production Mode] Starting with empty data store');
