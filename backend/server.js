@@ -115,7 +115,7 @@ const collector = new OpenClawCollector(agentService, sseManager, serverStatusSe
 collector.start();
 
 // Start server
-app.listen(config.port, () => {
-  console.log(`[Clawmander] Backend running on port ${config.port}`);
+app.listen(config.port, '127.0.0.1', () => {
+  console.log(`[Clawmander] Backend running on 127.0.0.1:${config.port}`);
   console.log(`[Clawmander] SSE endpoint: http://localhost:${config.port}/api/sse/subscribe`);
 });
