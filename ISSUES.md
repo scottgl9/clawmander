@@ -2,11 +2,11 @@
 
 ## OpenClaw WebSocket Connection Failure
 
-**Status**: Unresolved - Mitigated
+**Status**: Resolved
 **Severity**: High (causes extreme dashboard slowness due to reconnection loop)
 **Date Reported**: 2026-02-08
 **Date Mitigated**: 2026-02-08
-**Workaround**: Disabled OpenClaw collector to prevent reconnection spam
+**Date Resolved**: 2026-02-08
 
 ### Description
 
@@ -143,43 +143,30 @@ All rejected with: "must be equal to constant" errors.
 2. Dashboard functions normally without WebSocket reconnection spam
 3. Services respond quickly (15-20ms API response times)
 
-**Proper Fix (To Be Implemented)**:
+**Fix Applied** (2026-02-08):
 
-1. **Find Gateway Token**:
-   ```bash
-   cat ~/.config/openclaw/gateway.yaml | grep 'auth.token'
-   # OR
-   echo $OPENCLAW_GATEWAY_TOKEN
-   ```
+Three bugs were fixed in `OpenClawCollector.js`:
 
-2. **Configure Backend**:
-   ```bash
-   # In backend/.env
-   OPENCLAW_TOKEN=<your-gateway-token-here>
-   ```
+1. **Missing challenge handling**: Protocol v3 requires a 3-step handshake where the
+   Gateway sends a pre-connect challenge before the client sends its connect frame.
+   The collector was sending connect immediately on `ws.open`, skipping step 1.
+   Fixed: wait for `challenge` message, then send connect with nonce. Falls back
+   to sending connect after 2s timeout for localhost connections where challenge
+   is optional.
 
-3. **Re-enable Collector**:
-   - Uncomment lines 113-115 in `backend/server.js`
-   - Collector will now use valid token from env
+2. **Wrong hello-ok parsing**: The collector checked for `msg.type === 'hello-ok'`,
+   but the Gateway responds with `{type: "res", id, ok: true, result: ...}`. The
+   hello-ok data is inside a `res`-type message matching the connect request ID.
+   Fixed: detect connect response by matching `msg.type === 'res'` and
+   `msg.id === connectReqId`. Backward compatibility with bare `hello-ok` preserved.
 
-4. **Verify Connection**:
-   ```bash
-   ./service.sh restart
-   # Check logs for: "[OpenClaw] Handshake accepted"
-   ```
-
-**Why Previous Attempts Failed**:
-- Protocol parameters were eventually correct (cli/operator)
-- **But** the auth token was empty/missing
-- Gateway rejected connection due to authentication failure
-- Error messages were confusing ("invalid params" instead of "auth failed")
+3. **Collector re-enabled**: Uncommented the collector instantiation in `server.js`.
 
 **Impact**:
-- ✅ Dashboard performance restored (no slow reconnection attempts)
+- ✅ Dashboard performance restored
 - ✅ All core features functional (tasks, agents, budget, activity)
-- ❌ OpenClaw agent status auto-sync disabled (until token configured)
-- ❌ Missing real-time agent health monitoring from gateway
-- ❌ Manual agent status updates via REST API required
+- ✅ OpenClaw agent status auto-sync re-enabled
+- ✅ Real-time agent health monitoring from gateway restored
 
 ### References
 

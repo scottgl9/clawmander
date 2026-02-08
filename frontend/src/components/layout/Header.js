@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 
 export default function Header({ connected }) {
-  const [time, setTime] = useState(new Date());
+  const [time, setTime] = useState(null);
 
   useEffect(() => {
+    setTime(new Date());
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -19,8 +20,8 @@ export default function Header({ connected }) {
           <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500 pulse-glow'}`} />
           <span className="text-xs text-gray-400">{connected ? 'Connected' : 'Disconnected'}</span>
         </div>
-        <span className="text-sm text-gray-400 font-mono">
-          {time.toLocaleTimeString()}
+        <span className="text-sm text-gray-400 font-mono" suppressHydrationWarning>
+          {time ? time.toLocaleTimeString() : '--:--:--'}
         </span>
       </div>
     </header>

@@ -65,11 +65,40 @@ describe('OpenClawCollector', () => {
     return mockInstances[mockInstances.length - 1];
   }
 
-  function startAndConnect() {
+  // Opens the WebSocket but does NOT trigger handshake completion.
+  // After calling this, the collector is waiting for a challenge or 2s timeout.
+  function startAndOpen() {
     collector.start();
     const ws = getWs();
     ws.emit('open');
     return ws;
+  }
+
+  // Opens the WebSocket and advances the 2s challenge timeout so the
+  // connect frame is sent (simulates localhost where no challenge arrives).
+  function startAndConnect() {
+    const ws = startAndOpen();
+    jest.advanceTimersByTime(2000);
+    return ws;
+  }
+
+  // Opens the WebSocket and sends a challenge message from the Gateway,
+  // which triggers the connect frame to be sent with the challenge nonce.
+  function startAndConnectWithChallenge(nonce) {
+    const ws = startAndOpen();
+    ws.emit('message', JSON.stringify({ type: 'challenge', nonce: nonce || 'test-nonce-123' }));
+    return ws;
+  }
+
+  // Completes the full handshake via a res-type hello-ok response.
+  function completeHandshake(ws) {
+    const connectFrame = ws.sent.find(f => f.method === 'connect');
+    ws.emit('message', JSON.stringify({
+      type: 'res',
+      id: connectFrame.id,
+      ok: true,
+      result: { serverVersion: '3.0.0' },
+    }));
   }
 
   describe('start and handshake', () => {
@@ -86,7 +115,12 @@ describe('OpenClawCollector', () => {
       );
     });
 
-    test('sends protocol v3 connect frame on open', () => {
+    test('does not send connect frame immediately on open', () => {
+      const ws = startAndOpen();
+      expect(ws.sent).toHaveLength(0);
+    });
+
+    test('sends connect frame after 2s timeout when no challenge received', () => {
       const ws = startAndConnect();
       expect(ws.sent).toHaveLength(1);
 
@@ -94,8 +128,8 @@ describe('OpenClawCollector', () => {
       expect(frame.type).toBe('req');
       expect(frame.method).toBe('connect');
       expect(frame.id).toBeDefined();
-      expect(frame.params.client.id).toBe('clawmander');
-      expect(frame.params.client.mode).toBe('dashboard');
+      expect(frame.params.client.id).toBe('cli');
+      expect(frame.params.client.mode).toBe('operator');
       expect(frame.params.role).toBe('operator');
       expect(frame.params.scopes).toEqual(['operator.read']);
       expect(frame.params.auth).toBeDefined();
@@ -110,24 +144,70 @@ describe('OpenClawCollector', () => {
     });
   });
 
+  describe('challenge handling', () => {
+    test('sends connect frame immediately on receiving challenge', () => {
+      const ws = startAndOpen();
+      expect(ws.sent).toHaveLength(0);
+
+      ws.emit('message', JSON.stringify({ type: 'challenge', nonce: 'abc' }));
+      expect(ws.sent).toHaveLength(1);
+      expect(ws.sent[0].method).toBe('connect');
+    });
+
+    test('includes challenge nonce in connect frame', () => {
+      const ws = startAndConnectWithChallenge('nonce-xyz');
+      const frame = ws.sent[0];
+      expect(frame.params.client.nonce).toBe('nonce-xyz');
+    });
+
+    test('does not include nonce when no challenge received', () => {
+      const ws = startAndConnect();
+      const frame = ws.sent[0];
+      expect(frame.params.client.nonce).toBeUndefined();
+    });
+
+    test('cancels timeout when challenge arrives before 2s', () => {
+      const ws = startAndOpen();
+      // Challenge arrives at 500ms
+      jest.advanceTimersByTime(500);
+      ws.emit('message', JSON.stringify({ type: 'challenge', nonce: 'early' }));
+      expect(ws.sent).toHaveLength(1);
+
+      // Advancing past the 2s mark should NOT send another connect frame
+      jest.advanceTimersByTime(2000);
+      expect(ws.sent).toHaveLength(1);
+    });
+  });
+
   describe('hello-ok handling', () => {
-    test('updates server status on hello-ok', () => {
+    test('handles hello-ok wrapped in res message (protocol v3)', () => {
+      const ws = startAndConnect();
+      completeHandshake(ws);
+
+      expect(serverStatus.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          connection: 'connected',
+          serverVersion: '3.0.0',
+        })
+      );
+    });
+
+    test('handles bare hello-ok message (backward compatibility)', () => {
       const ws = startAndConnect();
 
       ws.emit('message', JSON.stringify({
         type: 'hello-ok',
-        serverVersion: '3.0.0',
-        serverHost: 'gw-1',
+        serverVersion: '2.0.0',
+        serverHost: 'gw-legacy',
         uptimeMs: 5000,
-        sessionDefaults: { defaultAgentId: 'agent-1' },
         presence: [{ host: 'client-a', platform: 'linux' }],
       }));
 
       expect(serverStatus.update).toHaveBeenCalledWith(
         expect.objectContaining({
           connection: 'connected',
-          serverVersion: '3.0.0',
-          serverHost: 'gw-1',
+          serverVersion: '2.0.0',
+          serverHost: 'gw-legacy',
           uptimeMs: 5000,
           presence: [{ host: 'client-a', platform: 'linux' }],
         })
@@ -136,31 +216,47 @@ describe('OpenClawCollector', () => {
 
     test('broadcasts connected health event on hello-ok', () => {
       const ws = startAndConnect();
-      ws.emit('message', JSON.stringify({ type: 'hello-ok' }));
+      completeHandshake(ws);
 
       expect(sse.broadcast).toHaveBeenCalledWith('system.health', { openClaw: 'connected' });
     });
 
     test('starts periodic fetch after hello-ok', () => {
       const ws = startAndConnect();
-      ws.emit('message', JSON.stringify({ type: 'hello-ok' }));
+      completeHandshake(ws);
 
-      // Should have sent RPC requests for periodic fetch (status, system-presence, last-heartbeat)
       // The connect frame is sent[0], periodic fetch RPCs start after hello-ok
-      // They are sent asynchronously via _doPeriodicFetch
-      // We need to flush promises
       expect(ws.sent.length).toBeGreaterThanOrEqual(1);
+    });
+
+    test('rejects connect if res has error', () => {
+      const ws = startAndConnect();
+      const connectFrame = ws.sent.find(f => f.method === 'connect');
+
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      ws.emit('message', JSON.stringify({
+        type: 'res',
+        id: connectFrame.id,
+        error: { code: 'AUTH_FAILED', message: 'invalid token' },
+      }));
+      consoleSpy.mockRestore();
+
+      // Should NOT have updated to connected
+      expect(serverStatus.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({ connection: 'connected' })
+      );
     });
   });
 
   describe('RPC response handling', () => {
     test('resolves pending request on res message', async () => {
       const ws = startAndConnect();
+      completeHandshake(ws);
 
-      const promise = collector._sendRequest('status');
+      const promise = collector._sendRequest('test-rpc');
 
-      // Find the request id
-      const reqFrame = ws.sent.find(f => f.method === 'status');
+      // Find the request id (use a unique method name to avoid matching periodic fetch)
+      const reqFrame = ws.sent.find(f => f.method === 'test-rpc');
       expect(reqFrame).toBeDefined();
 
       ws.emit('message', JSON.stringify({
@@ -175,6 +271,7 @@ describe('OpenClawCollector', () => {
 
     test('rejects pending request on res with error', async () => {
       const ws = startAndConnect();
+      completeHandshake(ws);
 
       const promise = collector._sendRequest('bad-method');
       const reqFrame = ws.sent.find(f => f.method === 'bad-method');
@@ -190,6 +287,7 @@ describe('OpenClawCollector', () => {
 
     test('request times out after 10 seconds', async () => {
       const ws = startAndConnect();
+      completeHandshake(ws);
 
       const promise = collector._sendRequest('slow-method');
 
@@ -337,6 +435,15 @@ describe('OpenClawCollector', () => {
       jest.advanceTimersByTime(60000);
       expect(mockInstances.length).toBe(count);
     });
+
+    test('clears challenge timer on close', () => {
+      const ws = startAndOpen();
+      // Close before the 2s challenge timeout
+      ws.emit('close');
+      // Advancing past the timeout should NOT send a connect frame
+      jest.advanceTimersByTime(3000);
+      expect(ws.sent).toHaveLength(0);
+    });
   });
 
   describe('status mapping', () => {
@@ -356,6 +463,7 @@ describe('OpenClawCollector', () => {
   describe('stop cleanup', () => {
     test('rejects pending requests on stop', async () => {
       const ws = startAndConnect();
+      completeHandshake(ws);
       const promise = collector._sendRequest('test');
       collector.stop();
       await expect(promise).rejects.toThrow('collector stopped');
@@ -365,6 +473,14 @@ describe('OpenClawCollector', () => {
       const ws = startAndConnect();
       collector.stop();
       expect(ws.closeCalled).toBe(true);
+    });
+
+    test('clears challenge timer on stop', () => {
+      const ws = startAndOpen();
+      collector.stop();
+      // Advancing past the timeout should NOT send a connect frame
+      jest.advanceTimersByTime(3000);
+      expect(ws.sent).toHaveLength(0);
     });
   });
 });

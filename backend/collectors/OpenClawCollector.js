@@ -13,6 +13,9 @@ class OpenClawCollector {
     this._reqId = 0;
     this._pendingRequests = new Map();
     this._periodicTimer = null;
+    this._connectReqId = null;
+    this._challengeTimer = null;
+    this._handshakeComplete = false;
   }
 
   start() {
@@ -24,6 +27,10 @@ class OpenClawCollector {
     this.running = false;
     this._stopPeriodicFetch();
     this._clearPending('collector stopped');
+    if (this._challengeTimer) {
+      clearTimeout(this._challengeTimer);
+      this._challengeTimer = null;
+    }
     if (this.ws) {
       this.ws.close();
       this.ws = null;
@@ -35,6 +42,8 @@ class OpenClawCollector {
 
     const url = config.openClaw.wsUrl;
     console.log(`[OpenClaw] Connecting to ${url}...`);
+    this._handshakeComplete = false;
+    this._connectReqId = null;
 
     if (this.serverStatus) {
       this.serverStatus.update({ connection: 'connecting', openClawUrl: url });
@@ -52,28 +61,18 @@ class OpenClawCollector {
     }
 
     this.ws.on('open', () => {
-      console.log('[OpenClaw] Connected');
+      console.log('[OpenClaw] Connected, waiting for challenge...');
       this.reconnectDelay = 1000;
 
-      // Send protocol v3 connect frame
-      this._sendRaw({
-        type: 'req',
-        id: this._nextId(),
-        method: 'connect',
-        params: {
-          minProtocol: 3,
-          maxProtocol: 3,
-          client: {
-            id: 'cli',
-            version: '1.0.0',
-            platform: process.platform,
-            mode: 'operator',
-          },
-          role: 'operator',
-          scopes: ['operator.read'],
-          auth: { token: config.openClaw.token || '' },
-        },
-      });
+      // Wait for challenge from Gateway. If none arrives within 2s
+      // (e.g. localhost connections where challenge is optional), send connect anyway.
+      this._challengeTimer = setTimeout(() => {
+        this._challengeTimer = null;
+        if (!this._handshakeComplete && !this._connectReqId) {
+          console.log('[OpenClaw] No challenge received, sending connect frame...');
+          this._sendConnectFrame(null);
+        }
+      }, 2000);
     });
 
     this.ws.on('message', (data) => {
@@ -89,6 +88,10 @@ class OpenClawCollector {
       console.log('[OpenClaw] Disconnected');
       this._stopPeriodicFetch();
       this._clearPending('disconnected');
+      if (this._challengeTimer) {
+        clearTimeout(this._challengeTimer);
+        this._challengeTimer = null;
+      }
       this.sse.broadcast('system.health', { openClaw: 'disconnected' });
       if (this.serverStatus) {
         this.serverStatus.update({
@@ -105,6 +108,41 @@ class OpenClawCollector {
     this.ws.on('error', (err) => {
       console.error(`[OpenClaw] Error: ${err.message}`);
     });
+  }
+
+  _sendConnectFrame(challenge) {
+    const id = this._nextId();
+    this._connectReqId = id;
+
+    const params = {
+      minProtocol: 3,
+      maxProtocol: 3,
+      client: {
+        id: 'cli',
+        version: '1.0.0',
+        platform: process.platform,
+        mode: 'operator',
+      },
+      role: 'operator',
+      scopes: ['operator.read'],
+      auth: { token: config.openClaw.token || '' },
+    };
+
+    // Include challenge nonce if the Gateway sent one
+    if (challenge && challenge.nonce) {
+      params.client.nonce = challenge.nonce;
+    }
+
+    this._sendRaw({ type: 'req', id, method: 'connect', params });
+  }
+
+  _handleChallenge(msg) {
+    console.log('[OpenClaw] Received challenge, responding with connect frame...');
+    if (this._challengeTimer) {
+      clearTimeout(this._challengeTimer);
+      this._challengeTimer = null;
+    }
+    this._sendConnectFrame(msg);
   }
 
   _scheduleReconnect() {
@@ -145,8 +183,25 @@ class OpenClawCollector {
   }
 
   _handleMessage(msg) {
+    // Handle pre-connect challenge (first message before handshake)
+    if (!this._handshakeComplete && !this._connectReqId && msg.type === 'challenge') {
+      this._handleChallenge(msg);
+      return;
+    }
+
+    // Handle connect response: Gateway wraps hello-ok inside a res message
+    if (!this._handshakeComplete && msg.type === 'res' && msg.id === this._connectReqId) {
+      if (msg.ok === true || (!msg.error && msg.result)) {
+        this._handleHelloOk(msg.result || msg.payload || msg);
+      } else if (msg.error) {
+        console.error('[OpenClaw] Connect rejected:', msg.error.code, msg.error.message);
+      }
+      return;
+    }
+
     switch (msg.type) {
       case 'hello-ok':
+        // Backward compatibility: bare hello-ok message
         this._handleHelloOk(msg);
         break;
       case 'res':
@@ -161,6 +216,7 @@ class OpenClawCollector {
   }
 
   _handleHelloOk(msg) {
+    this._handshakeComplete = true;
     console.log('[OpenClaw] Handshake accepted');
     const now = new Date().toISOString();
 

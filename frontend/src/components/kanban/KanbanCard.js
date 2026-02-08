@@ -1,12 +1,17 @@
+import { useState, useEffect } from 'react';
 import AgentAvatar from './AgentAvatar';
 import HeartbeatTimer from './HeartbeatTimer';
 import ProgressBar from '../shared/ProgressBar';
 import { PriorityBadge } from '../shared/Badge';
 
 export default function KanbanCard({ task, agent, heartbeat, onClick }) {
-  const timeAgo = task.updatedAt
-    ? formatTimeAgo(new Date(task.updatedAt))
-    : '';
+  const [timeAgo, setTimeAgo] = useState('');
+
+  useEffect(() => {
+    if (task.updatedAt) {
+      setTimeAgo(formatTimeAgo(new Date(task.updatedAt)));
+    }
+  }, [task.updatedAt]);
 
   return (
     <div

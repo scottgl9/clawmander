@@ -55,44 +55,69 @@ See [OpenClaw Gateway Security Docs](https://docs.openclaw.ai/gateway/security) 
 
 ### Connection
 
-Clawmander's backend automatically connects to OpenClaw's WebSocket using **Protocol v3**:
+Clawmander's backend automatically connects to OpenClaw's WebSocket using **Protocol v3**.
+
+The handshake is a 3-step process:
+1. **Gateway sends challenge** (optional for localhost) — client waits for this
+2. **Client sends connect frame** — includes challenge nonce if provided
+3. **Gateway replies with `res`** — `{type: "res", id, ok: true, result: ...}` confirms the connection
 
 ```javascript
-// backend/collectors/OpenClawCollector.js
+// backend/collectors/OpenClawCollector.js (simplified)
 const ws = new WebSocket('ws://127.0.0.1:18789');
+let connectReqId = null;
 
 ws.on('open', () => {
-  // OpenClaw Protocol v3 requires RPC-style connect request
-  ws.send(JSON.stringify({
-    type: 'req',
-    id: '1',  // Unique request ID
-    method: 'connect',
-    params: {
-      minProtocol: 3,
-      maxProtocol: 3,
-      client: {
-        id: 'cli',              // MUST be 'cli' for operator clients
-        version: '1.0.0',       // Clawmander version
-        platform: process.platform,  // 'linux', 'darwin', or 'win32'
-        mode: 'operator',       // MUST be 'operator' or 'node'
-      },
-      role: 'operator',         // Must match client.mode
-      scopes: ['operator.read'], // Requested permissions
-      auth: {
-        token: process.env.OPENCLAW_TOKEN || ''  // REQUIRED for non-localhost
-      }
-    }
-  }));
+  // Do NOT send connect immediately — wait for challenge from Gateway.
+  // For localhost (where challenge may be skipped), fall back after 2s.
+  setTimeout(() => {
+    if (!connectReqId) sendConnectFrame(null);
+  }, 2000);
 });
 
-// Gateway responds with 'hello-ok' on successful handshake
 ws.on('message', (data) => {
   const msg = JSON.parse(data.toString());
-  if (msg.type === 'hello-ok') {
+
+  // Step 1: Handle pre-connect challenge
+  if (msg.type === 'challenge') {
+    sendConnectFrame(msg);  // includes msg.nonce
+    return;
+  }
+
+  // Step 3: Handle connect response (hello-ok wrapped in res)
+  if (msg.type === 'res' && msg.id === connectReqId && msg.ok) {
     console.log('Connected to OpenClaw Gateway');
     // Connection established, can now send requests and receive events
+    return;
+  }
+
+  // Also handle bare hello-ok for backward compatibility
+  if (msg.type === 'hello-ok') {
+    console.log('Connected to OpenClaw Gateway (legacy)');
   }
 });
+
+// Step 2: Send connect frame
+function sendConnectFrame(challenge) {
+  connectReqId = '1';
+  const params = {
+    minProtocol: 3,
+    maxProtocol: 3,
+    client: {
+      id: 'cli',              // MUST be 'cli' for operator clients
+      version: '1.0.0',
+      platform: process.platform,
+      mode: 'operator',       // MUST be 'operator' or 'node'
+    },
+    role: 'operator',
+    scopes: ['operator.read'],
+    auth: { token: process.env.OPENCLAW_TOKEN || '' },
+  };
+  if (challenge && challenge.nonce) {
+    params.client.nonce = challenge.nonce;
+  }
+  ws.send(JSON.stringify({ type: 'req', id: connectReqId, method: 'connect', params }));
+}
 ```
 
 **Important Protocol Requirements**:

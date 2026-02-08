@@ -27,7 +27,7 @@ export default function ActivityLog({ limit = 20, showHeader = true }) {
           {items.length === 0 && <p className="text-xs text-gray-600">No activity yet</p>}
           {items.map((entry) => (
             <div key={entry.id} className="flex items-start gap-2 py-1 text-xs">
-              <span className="text-gray-600 font-mono flex-shrink-0 w-16">
+              <span className="text-gray-600 font-mono flex-shrink-0 w-16" suppressHydrationWarning>
                 {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
               <span className={`px-1 rounded flex-shrink-0 ${

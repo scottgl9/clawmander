@@ -277,6 +277,8 @@ Service Layer → SSEManager.broadcast(event, data)
 
 ### WebSocket Collector
 - Connects to `ws://127.0.0.1:18789`
+- Protocol v3 3-step handshake: challenge → connect → res (hello-ok)
+- 2s timeout fallback for localhost connections where challenge is optional
 - Auto-reconnect with exponential backoff (1s → 30s max)
 - Subscribes to: agent, health, heartbeat, tick, presence
 - Maps events to internal data structures
