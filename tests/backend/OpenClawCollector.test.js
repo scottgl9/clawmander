@@ -82,11 +82,15 @@ describe('OpenClawCollector', () => {
     return ws;
   }
 
-  // Opens the WebSocket and sends a challenge message from the Gateway,
-  // which triggers the connect frame to be sent with the challenge nonce.
+  // Opens the WebSocket and sends a challenge event from the Gateway,
+  // which triggers the connect frame to be sent.
   function startAndConnectWithChallenge(nonce) {
     const ws = startAndOpen();
-    ws.emit('message', JSON.stringify({ type: 'challenge', nonce: nonce || 'test-nonce-123' }));
+    ws.emit('message', JSON.stringify({
+      type: 'event',
+      event: 'connect.challenge',
+      payload: { nonce: nonce || 'test-nonce-123', ts: Date.now() },
+    }));
     return ws;
   }
 
@@ -97,7 +101,7 @@ describe('OpenClawCollector', () => {
       type: 'res',
       id: connectFrame.id,
       ok: true,
-      result: { serverVersion: '3.0.0' },
+      payload: { type: 'hello-ok', protocol: 3, server: { version: '3.0.0', host: 'test-host' } },
     }));
   }
 
@@ -129,7 +133,7 @@ describe('OpenClawCollector', () => {
       expect(frame.method).toBe('connect');
       expect(frame.id).toBeDefined();
       expect(frame.params.client.id).toBe('cli');
-      expect(frame.params.client.mode).toBe('operator');
+      expect(frame.params.client.mode).toBe('cli');
       expect(frame.params.role).toBe('operator');
       expect(frame.params.scopes).toEqual(['operator.read']);
       expect(frame.params.auth).toBeDefined();
@@ -145,24 +149,23 @@ describe('OpenClawCollector', () => {
   });
 
   describe('challenge handling', () => {
-    test('sends connect frame immediately on receiving challenge', () => {
+    test('sends connect frame immediately on receiving challenge event', () => {
       const ws = startAndOpen();
       expect(ws.sent).toHaveLength(0);
 
-      ws.emit('message', JSON.stringify({ type: 'challenge', nonce: 'abc' }));
+      ws.emit('message', JSON.stringify({
+        type: 'event',
+        event: 'connect.challenge',
+        payload: { nonce: 'abc', ts: Date.now() },
+      }));
       expect(ws.sent).toHaveLength(1);
       expect(ws.sent[0].method).toBe('connect');
     });
 
-    test('includes challenge nonce in connect frame', () => {
+    test('connect frame does not include nonce in client params', () => {
       const ws = startAndConnectWithChallenge('nonce-xyz');
       const frame = ws.sent[0];
-      expect(frame.params.client.nonce).toBe('nonce-xyz');
-    });
-
-    test('does not include nonce when no challenge received', () => {
-      const ws = startAndConnect();
-      const frame = ws.sent[0];
+      // Nonce is informational only — not sent back to the Gateway
       expect(frame.params.client.nonce).toBeUndefined();
     });
 
@@ -170,7 +173,11 @@ describe('OpenClawCollector', () => {
       const ws = startAndOpen();
       // Challenge arrives at 500ms
       jest.advanceTimersByTime(500);
-      ws.emit('message', JSON.stringify({ type: 'challenge', nonce: 'early' }));
+      ws.emit('message', JSON.stringify({
+        type: 'event',
+        event: 'connect.challenge',
+        payload: { nonce: 'early', ts: Date.now() },
+      }));
       expect(ws.sent).toHaveLength(1);
 
       // Advancing past the 2s mark should NOT send another connect frame
