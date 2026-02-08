@@ -156,6 +156,44 @@ Dashboard updates automatically on each heartbeat via:
 - API key validation for sensitive endpoints
 - Read-only access to OpenClaw data
 
+## Running as a Service (Linux)
+
+For production deployment, use the included systemd service management script:
+
+```bash
+# Install services (one-time setup)
+./service.sh install
+
+# Start services
+./service.sh start
+
+# Check status
+./service.sh status
+
+# View logs
+./service.sh logs              # Both services
+./service.sh logs backend      # Backend only
+./service.sh logs frontend     # Frontend only
+
+# Enable auto-start on boot
+./service.sh enable-boot
+
+# Stop services
+./service.sh stop
+
+# Restart services
+./service.sh restart
+
+# Uninstall services
+./service.sh uninstall
+```
+
+**Services:**
+- `clawmander-backend.service` - Backend API (port 3001)
+- `clawmander-frontend.service` - Frontend dashboard (port 3000)
+
+Services are installed to `~/.config/systemd/user/` and run as user services.
+
 ## Development
 
 ```bash

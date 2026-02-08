@@ -1,0 +1,16 @@
+[Unit]
+Description=Clawmander Dashboard Frontend
+After=network.target clawmander-backend.service
+Requires=clawmander-backend.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/sandbox/personal/clawmander/frontend
+ExecStart=/usr/bin/env npm run dev
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
