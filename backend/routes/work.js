@@ -18,8 +18,8 @@ module.exports = function (actionItemService) {
   });
 
   router.post('/action-items', requireAuth, (req, res) => {
-    const item = actionItemService.create(req.body);
-    res.status(201).json(item);
+    const result = actionItemService.upsert(req.body);
+    res.status(result.created ? 201 : 200).json(result.item);
   });
 
   router.patch('/action-items/:id', requireAuth, (req, res) => {

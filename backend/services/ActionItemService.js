@@ -41,6 +41,23 @@ class ActionItemService {
     return item;
   }
 
+  upsert(data) {
+    const { title, category } = data;
+    if (title && category) {
+      const existing = this.store.findBy(
+        (item) => item.title === title && item.category === category
+      );
+      if (existing) {
+        const { id, createdAt, ...rest } = data;
+        const updated = this.store.update(existing.id, rest);
+        if (updated) this.sse.broadcast('actionitem.updated', updated);
+        return { item: updated, created: false };
+      }
+    }
+    const item = this.create(data);
+    return { item, created: true };
+  }
+
   delete(id) {
     const removed = this.store.remove(id);
     if (removed) {

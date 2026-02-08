@@ -18,8 +18,8 @@ module.exports = function mountRoutes(app, services) {
   app.post('/api/agents/tasks', requireAuth, (req, res) => {
     const { agentId, task } = req.body;
     const taskData = { ...task, agentId: agentId || task?.agentId };
-    const created = taskService.create(taskData);
-    res.status(201).json(created);
+    const result = taskService.upsert(taskData);
+    res.status(result.created ? 201 : 200).json(result.task);
   });
 
   app.use('/api/tasks', tasksRoutes(taskService));
