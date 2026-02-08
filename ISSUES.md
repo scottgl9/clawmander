@@ -2,14 +2,15 @@
 
 ## OpenClaw WebSocket Connection Failure
 
-**Status**: Resolved
-**Severity**: High (non-critical - dashboard works without it)
+**Status**: Unresolved - Mitigated
+**Severity**: High (causes extreme dashboard slowness due to reconnection loop)
 **Date Reported**: 2026-02-08
-**Date Resolved**: 2026-02-08
+**Date Mitigated**: 2026-02-08
+**Workaround**: Disabled OpenClaw collector to prevent reconnection spam
 
 ### Description
 
-The backend fails to establish a persistent connection to OpenClaw gateway (ws://127.0.0.1:18789). The connection establishes but immediately disconnects, entering a reconnection loop with 1-10 second backoff delays.
+The backend fails to establish a persistent connection to OpenClaw gateway (ws://127.0.0.1:18789). The connection establishes but immediately disconnects, entering a reconnection loop with 1-10 second backoff delays. This continuous reconnection causes extreme slowness in the dashboard due to repeated failed handshakes and connection attempts.
 
 ### Symptoms
 
@@ -103,19 +104,36 @@ All rejected with: "must be equal to constant" errors.
 
 ### Resolution
 
-**Fix Applied**: Updated `backend/collectors/OpenClawCollector.js` (lines 58-77) with correct protocol constants:
+**Previous Attempt**: Updated `backend/collectors/OpenClawCollector.js` (commit 6bfee19) with protocol constants:
+- Changed `client.id` from "clawmander" to "cli"
+- Changed `client.mode` from "observer" to "operator"
 
-1. Changed `client.id` from "clawmander" to **"cli"**
-2. Changed `client.mode` from "observer" to **"operator"**
-3. Kept `role` as "operator" (already correct)
+**Result**: ❌ FAILED - OpenClaw gateway still rejects connection with:
+```
+invalid connect params: at /client/mode: must be equal to constant; at /client/mode: must match a schema in anyOf
+```
 
-**References**:
-- [OpenClaw Gateway Protocol Documentation](https://docs.openclaw.ai/gateway/protocol)
-- [OpenClaw Network Configuration](https://deepwiki.com/openclaw/openclaw/13.4-network-configuration)
-- [GitHub Issue #5710](https://github.com/openclaw/openclaw/issues/5710) - Similar client.id validation error
+**Testing Performed** (2026-02-08 11:30 UTC):
+- Tested all client.mode values: operator, node, device, cli, gateway, console, viewer, admin, monitor, agent
+- Only "node" mode passes initial validation but requires "device identity" parameter
+- "operator" mode is consistently rejected with schema validation error
+- Connection establishes successfully, then immediately closes after connect request
+- Reconnection loop causes 1-30 second backoff delays and repeated failures
 
-**Testing Required**:
-- Restart backend service
-- Verify WebSocket connection establishes without immediate disconnect
-- Confirm "hello-ok" response received from gateway
-- Check dashboard shows "OpenClaw gateway connection - Connected"
+**Mitigation Applied**:
+1. Disabled OpenClaw collector in `backend/server.js` (lines 113-115)
+2. Dashboard now functions normally without WebSocket spam
+3. Services start cleanly and respond immediately to API requests
+
+**Next Steps**:
+1. Contact OpenClaw support to clarify current Gateway Protocol v3 specification
+2. Determine if protocol has changed since v3 was introduced
+3. May need to implement v4 protocol or alternative integration method
+4. Consider alternative approaches: REST API polling, gRPC, or direct agent API calls
+
+**Impact**:
+- ✅ Dashboard performance restored (no slow reconnection attempts)
+- ✅ All core features functional (tasks, agents, budget, activity)
+- ❌ OpenClaw agent status auto-sync disabled
+- ❌ Missing real-time agent health monitoring from gateway
+- ❌ Manual agent status updates via REST API required

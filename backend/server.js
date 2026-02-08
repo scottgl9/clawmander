@@ -110,9 +110,10 @@ if (config.testMode) {
   console.log('[Production Mode] Starting with empty data store');
 }
 
-// Start OpenClaw collector
-const collector = new OpenClawCollector(agentService, sseManager, serverStatusService);
-collector.start();
+// Start OpenClaw collector (disabled due to protocol incompatibility)
+// TODO: OpenClaw Gateway API has changed - need to determine correct v3 handshake parameters
+// const collector = new OpenClawCollector(agentService, sseManager, serverStatusService);
+// collector.start();
 
 // Start server
 app.listen(config.port, '127.0.0.1', () => {
