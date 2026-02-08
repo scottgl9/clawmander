@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 
@@ -83,6 +83,8 @@ export default function Sidebar() {
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [enableTransition, setEnableTransition] = useState(false);
+  const initializedRef = useRef(false);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -92,6 +94,17 @@ export default function Sidebar() {
       setCollapsed(window.innerWidth < 1024);
     }
     setMounted(true);
+
+    // Enable transitions only after the correct state has been painted,
+    // so the initial localStorage read doesn't cause a visible animation.
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setEnableTransition(true);
+        });
+      });
+    }
   }, []);
 
   const toggle = () => {
@@ -104,7 +117,7 @@ export default function Sidebar() {
     <aside
       className={`${
         collapsed ? 'w-16' : 'w-52'
-      } bg-surface-light border-r border-gray-800 flex flex-col py-4 transition-all duration-200 flex-shrink-0 overflow-hidden`}
+      } bg-surface-light border-r border-gray-800 flex flex-col py-4 ${enableTransition ? 'transition-all duration-200' : ''} flex-shrink-0 overflow-hidden`}
     >
       <nav className="flex-1 flex flex-col gap-1 px-2">
         {NAV_ITEMS.map(({ href, label, icon }) => {
