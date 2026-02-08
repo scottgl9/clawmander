@@ -23,7 +23,8 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Work column */}
           <div className="space-y-4">
-            <ActionItemsList />
+            <ActionItemsList category="personal" />
+            <ActionItemsList category="work" />
             <WorkBrief />
           </div>
 

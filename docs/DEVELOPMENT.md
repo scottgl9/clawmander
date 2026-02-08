@@ -339,16 +339,16 @@ curl -N http://localhost:3001/api/sse/subscribe
 - [ ] Navigation works (Daily/Weekly/Monthly/Activity)
 - [ ] Widgets load data
 
-### Automated Testing (Future)
+### Automated Testing
 
 ```bash
 # Backend unit tests
 cd backend && npm test
 
-# Frontend component tests
+# Frontend component tests (future)
 cd frontend && npm test
 
-# E2E tests
+# E2E tests (future)
 npm run test:e2e
 ```
 
