@@ -111,7 +111,7 @@ if (config.testMode) {
 }
 
 // Start OpenClaw collector
-const collector = new OpenClawCollector(agentService, sseManager, serverStatusService);
+const collector = new OpenClawCollector(agentService, sseManager, serverStatusService, taskService);
 collector.start();
 
 // Start server

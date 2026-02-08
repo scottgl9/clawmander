@@ -27,6 +27,15 @@ describe('TaskService', () => {
     service = new TaskService(sse);
   });
 
+  test('getAll passes agentType filter', () => {
+    service.getAll({ agentType: 'subagent' });
+    expect(mockStore.findAll).toHaveBeenCalled();
+    const filterFn = mockStore.findAll.mock.calls[0][0];
+    expect(filterFn({ agentType: 'subagent' })).toBe(true);
+    expect(filterFn({ agentType: 'main' })).toBe(false);
+    expect(filterFn({})).toBe(false);
+  });
+
   test('create inserts task and broadcasts', () => {
     const result = service.create({ title: 'Test task', status: 'queued' });
 

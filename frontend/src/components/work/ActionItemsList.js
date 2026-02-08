@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAPI } from '../../hooks/useAPI';
 import { api } from '../../lib/api';
+import SimpleMarkdown from '../shared/SimpleMarkdown';
 
 const TITLES = {
   personal: 'Personal Items',
@@ -36,8 +37,8 @@ export default function ActionItemsList({ category }) {
               </span>
             </button>
             {expandedId === item.id && (item.details || item.description) && (
-              <div className="ml-5 mt-1 text-xs text-gray-400 border-l border-gray-700 pl-3 py-1 whitespace-pre-wrap">
-                {item.details || item.description}
+              <div className="ml-5 mt-1 text-xs text-gray-400 border-l border-gray-700 pl-3 py-1">
+                <SimpleMarkdown content={item.details || item.description} />
               </div>
             )}
           </li>
