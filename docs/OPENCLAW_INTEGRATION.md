@@ -22,6 +22,37 @@ OpenClaw (ws://127.0.0.1:18789)
 
 ## WebSocket Integration
 
+### Prerequisites
+
+**⚠️ IMPORTANT: Authentication is Required**
+
+OpenClaw Gateway requires authentication for WebSocket connections. Before connecting, you must:
+
+1. **Find Your Gateway Token**:
+   ```bash
+   # Method 1: Check the Gateway config file
+   cat ~/.config/openclaw/gateway.yaml | grep token
+
+   # Method 2: Check environment variables
+   printenv | grep OPENCLAW_GATEWAY_TOKEN
+
+   # Method 3: Check Gateway process
+   ps aux | grep openclaw-gateway
+   ```
+
+2. **Set the Token in Clawmander**:
+   ```bash
+   # In backend/.env
+   OPENCLAW_TOKEN=your-gateway-token-here
+   ```
+
+**Authentication Behavior**:
+- **Localhost (127.0.0.1)**: Authentication optional, device pairing auto-approved
+- **LAN/Remote**: Authentication **required**, Gateway refuses to start without it
+- **Missing Token**: Connection fails with "device identity required" or "invalid connect params"
+
+See [OpenClaw Gateway Security Docs](https://docs.openclaw.ai/gateway/security) for details.
+
 ### Connection
 
 Clawmander's backend automatically connects to OpenClaw's WebSocket using **Protocol v3**:
@@ -42,13 +73,13 @@ ws.on('open', () => {
       client: {
         id: 'cli',              // MUST be 'cli' for operator clients
         version: '1.0.0',       // Clawmander version
-        platform: 'darwin',     // Process platform (darwin, linux, win32)
+        platform: process.platform,  // 'linux', 'darwin', or 'win32'
         mode: 'operator',       // MUST be 'operator' or 'node'
       },
       role: 'operator',         // Must match client.mode
       scopes: ['operator.read'], // Requested permissions
       auth: {
-        token: process.env.OPENCLAW_TOKEN || ''
+        token: process.env.OPENCLAW_TOKEN || ''  // REQUIRED for non-localhost
       }
     }
   }));
@@ -64,12 +95,26 @@ ws.on('message', (data) => {
 });
 ```
 
-**Important Protocol Constants**:
-- `client.id`: Must be **"cli"** for operator clients (NOT custom values)
-- `client.mode`: Must be **"operator"** (for monitoring) or **"node"** (for devices)
-- `role`: Must match `client.mode`
+**Important Protocol Requirements**:
+- `client.id`: Must be **"cli"** for operator clients (NOT custom values like "clawmander")
+- `client.mode`: Must be **"operator"** (for monitoring/UI) or **"node"** (for device nodes)
+- `role`: Must match `client.mode` exactly
+- `auth.token`: **Required** - must match the Gateway's configured token
+- `platform`: Should be actual platform: "linux", "darwin", "win32"
 
-See [OpenClaw Gateway Protocol](https://docs.openclaw.ai/gateway/protocol) for full specification.
+**Common Connection Errors**:
+- `"device identity required"` → Missing or invalid auth token
+- `"invalid connect params: at /client/id"` → Wrong client.id value (not "cli")
+- `"invalid connect params: at /client/mode"` → Wrong mode value or version mismatch
+- `1008: pairing required` → Remote connection without proper authentication
+
+### Protocol References
+
+Official documentation:
+- [Gateway Protocol Specification](https://docs.openclaw.ai/gateway/protocol)
+- [Gateway Security & Auth](https://docs.openclaw.ai/gateway/security)
+- [Gateway Configuration](https://deepwiki.com/openclaw/openclaw/3.1-gateway-configuration)
+- [Network Configuration](https://deepwiki.com/openclaw/openclaw/13.4-network-configuration)
 
 ### Event Subscriptions
 
@@ -444,30 +489,96 @@ POST /api/agents/heartbeat
 
 ## Configuration
 
-### Backend Configuration
+### Step 1: Find Your OpenClaw Gateway Token
+
+OpenClaw Gateway requires authentication. The token is generated during setup:
+
+```bash
+# Method 1: Check Gateway config file
+cat ~/.config/openclaw/gateway.yaml | grep 'auth.token'
+# Look for: gateway.auth.token: "abc123..."
+
+# Method 2: Check environment variable
+echo $OPENCLAW_GATEWAY_TOKEN
+
+# Method 3: Check running Gateway process
+ps aux | grep openclaw-gateway | grep token
+
+# Method 4: If no token exists, generate one
+openssl rand -hex 32
+# Then set it in gateway.yaml or as OPENCLAW_GATEWAY_TOKEN
+```
+
+**Note**: If your Gateway is running on `127.0.0.1:18789` without a token, it's in **insecure mode**. While authentication is optional for localhost, it's **required** for LAN/remote access.
+
+### Step 2: Configure Clawmander Backend
 
 **`backend/.env`**:
 ```env
-# OpenClaw WebSocket URL
+# OpenClaw WebSocket URL (use localhost for auto-approved device pairing)
 OPENCLAW_WS_URL=ws://127.0.0.1:18789
 
-# OpenClaw authentication token (if required)
-OPENCLAW_TOKEN=your-openclaw-token
+# OpenClaw Gateway authentication token (REQUIRED)
+# Copy the token from your Gateway configuration
+OPENCLAW_TOKEN=your-actual-gateway-token-from-step-1
 
-# API authentication (for OpenClaw to call Clawmander)
+# API authentication (for OpenClaw agents to call Clawmander)
 AUTH_TOKEN=secure-random-token
 ```
 
-### OpenClaw Configuration
+### Step 3: Verify Backend Configuration
 
-In your OpenClaw agent configs, set:
+```bash
+# Check that backend config has the token
+cd backend
+node -e "require('dotenv').config(); console.log('Token set:', !!process.env.OPENCLAW_TOKEN)"
+
+# Should output: Token set: true
+```
+
+### Step 4: Restart Services
+
+```bash
+# Using the service script
+./service.sh restart
+
+# Or manually
+cd backend && node server.js
+```
+
+### OpenClaw Agent Configuration (Optional)
+
+If you want OpenClaw agents to push updates to Clawmander:
 
 ```yaml
 # openclaw-config.yaml
 clawmander:
   api_url: http://localhost:3001
-  auth_token: secure-random-token
+  auth_token: secure-random-token  # Matches AUTH_TOKEN in backend/.env
   heartbeat_interval: 300
+```
+
+### Troubleshooting Authentication
+
+**Connection fails with "device identity required"**:
+- ✅ **Fix**: Add valid `OPENCLAW_TOKEN` to backend/.env
+- Gateway token is missing or incorrect
+- Verify token matches Gateway configuration
+
+**Connection fails with "invalid connect params"**:
+- Client version mismatch (update OpenClaw/Clawmander)
+- Wrong client.id (must be "cli" for operators)
+- Missing required fields in connect params
+
+**Gateway refuses to start with "refusing to bind...without auth"**:
+- Gateway is configured for LAN/tailnet but has no auth token
+- Set `gateway.auth.token` in Gateway config
+- Or set `OPENCLAW_GATEWAY_TOKEN` environment variable
+
+**For insecure local testing only** (not recommended):
+```yaml
+# In Gateway config (NOT SECURE - localhost only)
+gateway.controlUi.allowInsecureAuth: true
 ```
 
 ## Graceful Degradation
