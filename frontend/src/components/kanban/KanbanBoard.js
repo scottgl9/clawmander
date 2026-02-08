@@ -3,12 +3,14 @@ import { api } from '../../lib/api';
 import { useSSE } from '../../hooks/useSSE';
 import { KANBAN_COLUMNS } from '../../lib/constants';
 import KanbanColumn from './KanbanColumn';
+import TaskDetailModal from '../shared/TaskDetailModal';
 
 export default function KanbanBoard() {
   const [tasks, setTasks] = useState([]);
   const [agents, setAgents] = useState([]);
   const [heartbeats, setHeartbeats] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedTask, setSelectedTask] = useState(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -64,6 +66,12 @@ export default function KanbanBoard() {
     );
   }
 
+  const handleTaskClick = (task) => {
+    setSelectedTask(task);
+  };
+
+  const selectedAgent = selectedTask ? agents.find(a => a.id === selectedTask.agentId) : null;
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -79,9 +87,17 @@ export default function KanbanBoard() {
             tasks={tasks.filter((t) => t.status === key)}
             agents={agents}
             heartbeats={heartbeats}
+            onTaskClick={handleTaskClick}
           />
         ))}
       </div>
+
+      <TaskDetailModal
+        task={selectedTask}
+        agent={selectedAgent}
+        isOpen={!!selectedTask}
+        onClose={() => setSelectedTask(null)}
+      />
     </div>
   );
 }
