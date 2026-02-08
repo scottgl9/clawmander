@@ -3,13 +3,16 @@ import HeartbeatTimer from './HeartbeatTimer';
 import ProgressBar from '../shared/ProgressBar';
 import { PriorityBadge } from '../shared/Badge';
 
-export default function KanbanCard({ task, agent, heartbeat }) {
+export default function KanbanCard({ task, agent, heartbeat, onClick }) {
   const timeAgo = task.updatedAt
     ? formatTimeAgo(new Date(task.updatedAt))
     : '';
 
   return (
-    <div className="bg-surface-light rounded-lg p-3 mb-2 border border-gray-800 hover:border-gray-600 transition-colors">
+    <div
+      className="bg-surface-light rounded-lg p-3 mb-2 border border-gray-800 hover:border-gray-600 transition-colors cursor-pointer"
+      onClick={() => onClick && onClick(task)}
+    >
       <div className="flex items-start justify-between gap-2 mb-2">
         <h4 className="text-sm font-medium text-white leading-tight flex-1">{task.title}</h4>
         <PriorityBadge priority={task.priority} />

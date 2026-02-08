@@ -1,13 +1,16 @@
+import { useState } from 'react';
 import Layout from '../components/layout/Layout';
 import { useAPI } from '../hooks/useAPI';
 import { useSSE } from '../hooks/useSSE';
 import { api } from '../lib/api';
 import { StatusBadge, PriorityBadge } from '../components/shared/Badge';
 import ProgressBar from '../components/shared/ProgressBar';
+import TaskDetailModal from '../components/shared/TaskDetailModal';
 
 export default function DailyView() {
   const connected = useSSE(() => {});
   const { data, loading, error } = useAPI(() => api.views.getDaily());
+  const [selectedTask, setSelectedTask] = useState(null);
 
   return (
     <Layout connected={connected}>
@@ -35,7 +38,11 @@ export default function DailyView() {
               <h3 className="text-sm font-semibold text-white mb-3">Today&apos;s Tasks</h3>
               <div className="space-y-2">
                 {data.tasks?.map((task) => (
-                  <div key={task.id} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
+                  <div
+                    key={task.id}
+                    className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0 cursor-pointer hover:bg-surface-light px-2 -mx-2 rounded transition-colors"
+                    onClick={() => setSelectedTask(task)}
+                  >
                     <div className="flex items-center gap-3">
                       <StatusBadge status={task.status} />
                       <span className="text-sm text-gray-300">{task.title}</span>
@@ -65,6 +72,13 @@ export default function DailyView() {
             </div>
           </div>
         )}
+
+        <TaskDetailModal
+          task={selectedTask}
+          agent={selectedTask ? data?.agents?.find(a => a.id === selectedTask.agentId) : null}
+          isOpen={!!selectedTask}
+          onClose={() => setSelectedTask(null)}
+        />
       </div>
     </Layout>
   );
