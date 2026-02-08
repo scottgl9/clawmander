@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: '/monthly', label: 'Monthly', icon: 'M' },
   { href: '/budget', label: 'Budget', icon: '$' },
   { href: '/activity', label: 'Activity', icon: 'A' },
+  { href: '/completed', label: 'Completed', icon: 'C' },
   { href: '/server', label: 'Server', icon: 'S' },
 ];
 
