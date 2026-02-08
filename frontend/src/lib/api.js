@@ -39,6 +39,9 @@ export const api = {
     getWeekly: () => fetchJSON('/api/views/weekly'),
     getMonthly: () => fetchJSON('/api/views/monthly'),
   },
+  server: {
+    getStatus: () => fetchJSON('/api/server/status'),
+  },
   activity: {
     getLog: (params = {}) => {
       const qs = new URLSearchParams(params).toString();
