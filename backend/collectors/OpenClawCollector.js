@@ -64,10 +64,10 @@ class OpenClawCollector {
           minProtocol: 3,
           maxProtocol: 3,
           client: {
-            id: 'clawmander',
+            id: 'cli',
             version: '1.0.0',
             platform: process.platform,
-            mode: 'observer',
+            mode: 'operator',
           },
           role: 'operator',
           scopes: ['operator.read'],

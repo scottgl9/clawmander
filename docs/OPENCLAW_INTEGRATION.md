@@ -24,20 +24,52 @@ OpenClaw (ws://127.0.0.1:18789)
 
 ### Connection
 
-Clawmander's backend automatically connects to OpenClaw's WebSocket:
+Clawmander's backend automatically connects to OpenClaw's WebSocket using **Protocol v3**:
 
 ```javascript
 // backend/collectors/OpenClawCollector.js
 const ws = new WebSocket('ws://127.0.0.1:18789');
 
 ws.on('open', () => {
+  // OpenClaw Protocol v3 requires RPC-style connect request
   ws.send(JSON.stringify({
-    type: 'connect',
-    token: process.env.OPENCLAW_TOKEN,
-    subscribe: ['agent', 'health', 'heartbeat', 'tick', 'presence'],
+    type: 'req',
+    id: '1',  // Unique request ID
+    method: 'connect',
+    params: {
+      minProtocol: 3,
+      maxProtocol: 3,
+      client: {
+        id: 'cli',              // MUST be 'cli' for operator clients
+        version: '1.0.0',       // Clawmander version
+        platform: 'darwin',     // Process platform (darwin, linux, win32)
+        mode: 'operator',       // MUST be 'operator' or 'node'
+      },
+      role: 'operator',         // Must match client.mode
+      scopes: ['operator.read'], // Requested permissions
+      auth: {
+        token: process.env.OPENCLAW_TOKEN || ''
+      }
+    }
   }));
 });
+
+// Gateway responds with 'hello-ok' on successful handshake
+ws.on('message', (data) => {
+  const msg = JSON.parse(data.toString());
+  if (msg.type === 'hello-ok') {
+    console.log('Connected to OpenClaw Gateway');
+    // Connection established, can now send requests and receive events
+  }
+});
 ```
+
+**Important Protocol Constants**:
+- `client.id`: Must be **"cli"** for operator clients (NOT custom values)
+- `client.mode`: Must be **"operator"** (for monitoring) or **"node"** (for devices)
+- `role`: Must match `client.mode`
+
+See [OpenClaw Gateway Protocol](https://docs.openclaw.ai/gateway/protocol) for full specification.
 
 ### Event Subscriptions
 

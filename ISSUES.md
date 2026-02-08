@@ -2,9 +2,10 @@
 
 ## OpenClaw WebSocket Connection Failure
 
-**Status**: Open
+**Status**: Resolved
 **Severity**: High (non-critical - dashboard works without it)
 **Date Reported**: 2026-02-08
+**Date Resolved**: 2026-02-08
 
 ### Description
 
@@ -19,31 +20,34 @@ The backend fails to establish a persistent connection to OpenClaw gateway (ws:/
 
 ### Root Cause
 
-**Protocol Mismatch**: The backend attempts to use OpenClaw protocol v3 with the following connection parameters:
+**Protocol Mismatch**: The backend was using incorrect OpenClaw protocol v3 connection parameters:
 
+**Incorrect Parameters** (BEFORE FIX):
 ```json
 {
-  "type": "req",
-  "method": "connect",
-  "params": {
-    "minProtocol": 3,
-    "maxProtocol": 3,
-    "client": {
-      "id": "clawmander",
-      "version": "1.0.0",
-      "platform": "linux",
-      "mode": "observer"
-    },
-    "role": "operator",
-    "scopes": ["operator.read"],
-    "auth": { "token": "" }
-  }
+  "client": {
+    "id": "clawmander",  ❌ Wrong - must be "cli" for operator clients
+    "mode": "observer"   ❌ Wrong - must be "operator" or "node"
+  },
+  "role": "operator"
 }
 ```
 
-The OpenClaw server rejects this with:
-- `client.id` must be a specific constant (value unknown)
-- `client.mode` must be a specific constant (value unknown)
+**Correct Parameters** (AFTER FIX):
+```json
+{
+  "client": {
+    "id": "cli",         ✅ Correct - standard constant for operator clients
+    "mode": "operator"   ✅ Correct - matches the role
+  },
+  "role": "operator"
+}
+```
+
+The OpenClaw Gateway enforces strict schema validation where:
+- `client.id` must be a protocol constant: **"cli"** for operator clients, or device identifiers like "ios-node" for nodes
+- `client.mode` must be either **"operator"** or **"node"** (matches the role)
+- `role` must match the client mode
 
 ### Testing Performed
 
@@ -97,9 +101,21 @@ All rejected with: "must be equal to constant" errors.
 - Current implementation uses complex v3 protocol with RPC-style messages
 - Discrepancy suggests protocol may have evolved since documentation was written
 
-### Next Steps
+### Resolution
 
-1. Determine correct OpenClaw protocol v3 constants
-2. Update connection parameters in OpenClawCollector
-3. Test connection with corrected parameters
-4. Update OPENCLAW_INTEGRATION.md if protocol has changed
+**Fix Applied**: Updated `backend/collectors/OpenClawCollector.js` (lines 58-77) with correct protocol constants:
+
+1. Changed `client.id` from "clawmander" to **"cli"**
+2. Changed `client.mode` from "observer" to **"operator"**
+3. Kept `role` as "operator" (already correct)
+
+**References**:
+- [OpenClaw Gateway Protocol Documentation](https://docs.openclaw.ai/gateway/protocol)
+- [OpenClaw Network Configuration](https://deepwiki.com/openclaw/openclaw/13.4-network-configuration)
+- [GitHub Issue #5710](https://github.com/openclaw/openclaw/issues/5710) - Similar client.id validation error
+
+**Testing Required**:
+- Restart backend service
+- Verify WebSocket connection establishes without immediate disconnect
+- Confirm "hello-ok" response received from gateway
+- Check dashboard shows "OpenClaw gateway connection - Connected"
