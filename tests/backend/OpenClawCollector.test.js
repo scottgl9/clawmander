@@ -41,11 +41,20 @@ function mockServerStatus() {
   return { update: jest.fn(), getStatus: jest.fn() };
 }
 
+function mockTaskService() {
+  return {
+    upsert: jest.fn().mockReturnValue({ task: { id: 'task-1' }, created: true }),
+    getAll: jest.fn().mockReturnValue([]),
+    update: jest.fn().mockReturnValue({ id: 'task-1', status: 'done' }),
+  };
+}
+
 describe('OpenClawCollector', () => {
   let collector;
   let agentService;
   let sse;
   let serverStatus;
+  let taskService;
 
   beforeEach(() => {
     jest.useFakeTimers();
@@ -53,7 +62,8 @@ describe('OpenClawCollector', () => {
     agentService = mockAgentService();
     sse = mockSSE();
     serverStatus = mockServerStatus();
-    collector = new OpenClawCollector(agentService, sse, serverStatus);
+    taskService = mockTaskService();
+    collector = new OpenClawCollector(agentService, sse, serverStatus, taskService);
   });
 
   afterEach(() => {
@@ -398,6 +408,146 @@ describe('OpenClawCollector', () => {
           status: 'active',
         })
       );
+    });
+  });
+
+  describe('lifecycle events (start/end/error)', () => {
+    test('start event creates task and marks agent active', () => {
+      const ws = startAndConnect();
+
+      ws.emit('message', JSON.stringify({
+        type: 'event',
+        event: 'start',
+        payload: {
+          agentId: 'agent-1',
+          sessionKey: 'agent:agent-1:sess-1',
+          runId: 'run-1',
+          title: 'Test run',
+        },
+      }));
+
+      expect(taskService.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agentId: 'agent-1',
+          sessionKey: 'agent:agent-1:sess-1',
+          runId: 'run-1',
+          status: 'in_progress',
+          agentType: 'main',
+        })
+      );
+      expect(agentService.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'agent-1', status: 'active' })
+      );
+    });
+
+    test('start event detects subagent from session key', () => {
+      const ws = startAndConnect();
+
+      ws.emit('message', JSON.stringify({
+        type: 'event',
+        event: 'start',
+        payload: {
+          agentId: 'agent-1',
+          sessionKey: 'agent:agent-1:subagent:sub-uuid',
+          runId: 'run-2',
+        },
+      }));
+
+      expect(taskService.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ agentType: 'subagent' })
+      );
+    });
+
+    test('end event completes matching task and sets agent idle', () => {
+      const matchingTask = { id: 'task-1', sessionKey: 'sess-1', runId: 'run-1', status: 'in_progress' };
+      taskService.getAll
+        .mockReturnValueOnce([matchingTask])  // first call: find by agentId
+        .mockReturnValueOnce([]);              // second call: check remaining in_progress
+
+      const ws = startAndConnect();
+
+      ws.emit('message', JSON.stringify({
+        type: 'event',
+        event: 'end',
+        payload: { agentId: 'agent-1', sessionKey: 'sess-1', runId: 'run-1' },
+      }));
+
+      expect(taskService.update).toHaveBeenCalledWith('task-1', { status: 'done', progress: 100 });
+      expect(agentService.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'agent-1', status: 'idle' })
+      );
+    });
+
+    test('end event keeps agent active if other tasks remain', () => {
+      const matchingTask = { id: 'task-1', sessionKey: 'sess-1', runId: 'run-1', status: 'in_progress' };
+      const otherTask = { id: 'task-2', sessionKey: 'sess-2', runId: 'run-2', status: 'in_progress' };
+      taskService.getAll
+        .mockReturnValueOnce([matchingTask, otherTask])  // find by agentId
+        .mockReturnValueOnce([otherTask]);               // remaining in_progress
+
+      const ws = startAndConnect();
+
+      ws.emit('message', JSON.stringify({
+        type: 'event',
+        event: 'end',
+        payload: { agentId: 'agent-1', sessionKey: 'sess-1', runId: 'run-1' },
+      }));
+
+      expect(taskService.update).toHaveBeenCalledWith('task-1', { status: 'done', progress: 100 });
+      // Agent should NOT be set to idle
+      expect(agentService.upsert).not.toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'idle' })
+      );
+    });
+
+    test('error event blocks matching task and sets agent error', () => {
+      const matchingTask = { id: 'task-1', sessionKey: 'sess-1', runId: 'run-1', status: 'in_progress', metadata: {} };
+      taskService.getAll.mockReturnValueOnce([matchingTask]);
+
+      const ws = startAndConnect();
+
+      ws.emit('message', JSON.stringify({
+        type: 'event',
+        event: 'error',
+        payload: { agentId: 'agent-1', sessionKey: 'sess-1', runId: 'run-1', error: 'Connection failed' },
+      }));
+
+      expect(taskService.update).toHaveBeenCalledWith('task-1', {
+        status: 'blocked',
+        metadata: { error: 'Connection failed' },
+      });
+      expect(agentService.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'agent-1', status: 'error' })
+      );
+    });
+
+    test('lifecycle events are no-ops without taskService', () => {
+      const collectorNoTask = new OpenClawCollector(agentService, sse, serverStatus);
+      collectorNoTask.start();
+      const ws = getWs();
+      ws.emit('open');
+      jest.advanceTimersByTime(2000);
+
+      ws.emit('message', JSON.stringify({
+        type: 'event',
+        event: 'start',
+        payload: { agentId: 'agent-1', runId: 'run-1' },
+      }));
+
+      expect(taskService.upsert).not.toHaveBeenCalled();
+      collectorNoTask.stop();
+    });
+
+    test('start event ignores payload without agentId', () => {
+      const ws = startAndConnect();
+
+      ws.emit('message', JSON.stringify({
+        type: 'event',
+        event: 'start',
+        payload: { runId: 'run-1' },
+      }));
+
+      expect(taskService.upsert).not.toHaveBeenCalled();
     });
   });
 

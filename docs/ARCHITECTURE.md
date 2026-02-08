@@ -84,12 +84,16 @@ frontend/src/
 │   ├── api.js          # API client functions
 │   └── constants.js    # App-wide constants
 ├── pages/
-│   ├── index.js        # Main dashboard
+│   ├── index.js        # Main dashboard (agent status dot + widgets)
+│   ├── agents.js       # Agent task kanban board
 │   ├── daily.js        # Daily view
 │   ├── weekly.js       # Weekly view
 │   ├── monthly.js      # Monthly view
 │   ├── activity.js     # Activity log page
-│   └── completed.js    # Completed tasks archive
+│   └── completed/
+│       ├── index.js    # Redirects to /completed/agent
+│       ├── agent.js    # Completed agent tasks
+│       └── mine.js     # Completed user action items
 └── styles/
     └── globals.css     # Global styles and theme
 ```
@@ -280,8 +284,10 @@ Service Layer → SSEManager.broadcast(event, data)
 - Protocol v3 3-step handshake: challenge → connect → res (hello-ok)
 - 2s timeout fallback for localhost connections where challenge is optional
 - Auto-reconnect with exponential backoff (1s → 30s max)
-- Subscribes to: agent, health, heartbeat, tick, presence
+- Subscribes to: agent, health, heartbeat, tick, presence, start, end, error
 - Maps events to internal data structures
+- Lifecycle events (start/end/error) automatically create/update tasks via TaskService
+- Parses session keys to detect subagent work (`agent:<id>:subagent:<uuid>`)
 - Emits SSE events on state changes
 
 ### Event Mapping
@@ -292,6 +298,9 @@ Service Layer → SSEManager.broadcast(event, data)
 | `heartbeat` | Record heartbeat | `heartbeat.received` |
 | `tick` | Update agent timestamp | - |
 | `health` | Broadcast health | `system.health` |
+| `start` | Create task, mark agent active | `task.created` |
+| `end` | Complete task, mark agent idle | `task.updated` |
+| `error` | Block task, mark agent error | `task.updated` |
 
 ### Graceful Degradation
 - Dashboard works without OpenClaw

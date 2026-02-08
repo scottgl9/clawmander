@@ -1,11 +1,13 @@
 const WebSocket = require('ws');
 const config = require('../config/config');
+const { parseSessionKey } = require('../models/Task');
 
 class OpenClawCollector {
-  constructor(agentService, sseManager, serverStatusService) {
+  constructor(agentService, sseManager, serverStatusService, taskService) {
     this.agentService = agentService;
     this.sse = sseManager;
     this.serverStatus = serverStatusService;
+    this.taskService = taskService;
     this.ws = null;
     this.reconnectDelay = 1000;
     this.maxReconnectDelay = 30000;
@@ -266,6 +268,15 @@ class OpenClawCollector {
       case 'tick':
         this._handleHeartbeat(payload || {});
         break;
+      case 'start':
+        this._handleRunStart(payload || {});
+        break;
+      case 'end':
+        this._handleRunEnd(payload || {});
+        break;
+      case 'error':
+        this._handleRunError(payload || {});
+        break;
       default:
         break;
     }
@@ -292,6 +303,77 @@ class OpenClawCollector {
         lastHeartbeat: new Date().toISOString(),
       });
     }
+  }
+
+  _handleRunStart(data) {
+    if (!this.taskService) return;
+    const agentId = data.agentId || data.id;
+    if (!agentId) return;
+
+    const parsed = parseSessionKey(data.sessionKey);
+    const agentType = parsed.isSubagent ? 'subagent' : 'main';
+
+    this.taskService.upsert({
+      title: data.title || `Run ${data.runId || 'unknown'}`,
+      agentId,
+      sessionKey: data.sessionKey || null,
+      runId: data.runId || null,
+      status: 'in_progress',
+      agentType,
+      metadata: data.metadata || {},
+    });
+
+    this.agentService.upsert({
+      id: agentId,
+      name: data.name || agentId,
+      status: 'active',
+    });
+  }
+
+  _handleRunEnd(data) {
+    if (!this.taskService) return;
+    const agentId = data.agentId || data.id;
+    if (!agentId) return;
+
+    const tasks = this.taskService.getAll({ agentId });
+    const match = tasks.find(
+      (t) => t.sessionKey === data.sessionKey && t.runId === data.runId && t.status !== 'done'
+    );
+    if (match) {
+      this.taskService.update(match.id, { status: 'done', progress: 100 });
+    }
+
+    const remaining = this.taskService.getAll({ agentId, status: 'in_progress' });
+    if (remaining.length === 0) {
+      this.agentService.upsert({
+        id: agentId,
+        name: data.name || agentId,
+        status: 'idle',
+      });
+    }
+  }
+
+  _handleRunError(data) {
+    if (!this.taskService) return;
+    const agentId = data.agentId || data.id;
+    if (!agentId) return;
+
+    const tasks = this.taskService.getAll({ agentId });
+    const match = tasks.find(
+      (t) => t.sessionKey === data.sessionKey && t.runId === data.runId && t.status !== 'done'
+    );
+    if (match) {
+      this.taskService.update(match.id, {
+        status: 'blocked',
+        metadata: { ...match.metadata, error: data.error || data.message || 'Unknown error' },
+      });
+    }
+
+    this.agentService.upsert({
+      id: agentId,
+      name: data.name || agentId,
+      status: 'error',
+    });
   }
 
   _mapStatus(status) {

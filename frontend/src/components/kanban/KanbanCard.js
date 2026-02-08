@@ -19,7 +19,12 @@ export default function KanbanCard({ task, agent, heartbeat, onClick }) {
       onClick={() => onClick && onClick(task)}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <h4 className="text-sm font-medium text-white leading-tight flex-1">{task.title}</h4>
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          <h4 className="text-sm font-medium text-white leading-tight truncate">{task.title}</h4>
+          {task.agentType === 'subagent' && (
+            <span className="flex-shrink-0 px-1 py-0.5 bg-purple-500/20 text-purple-400 rounded text-[9px] font-medium">sub</span>
+          )}
+        </div>
         <PriorityBadge priority={task.priority} />
       </div>
 
