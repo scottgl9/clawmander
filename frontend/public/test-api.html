@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Connection Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #fff; }
+        .success { color: #22c55e; }
+        .error { color: #ef4444; }
+        .info { color: #3b82f6; }
+        pre { background: #2a2a2a; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        button { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #2563eb; }
+    </style>
+</head>
+<body>
+    <h1>Clawmander API Connection Test</h1>
+    <p class="info">Testing connection from browser to backend API...</p>
+    
+    <button onclick="testAPI()">Test API Connection</button>
+    <button onclick="testSSE()">Test SSE Connection</button>
+    <button onclick="location.reload()">Refresh Page</button>
+    
+    <div id="results"></div>
+    
+    <script>
+        const API_URL = 'http://192.168.1.104:3001';
+        const resultsDiv = document.getElementById('results');
+        
+        function log(message, type = 'info') {
+            const p = document.createElement('p');
+            p.className = type;
+            p.textContent = message;
+            resultsDiv.appendChild(p);
+        }
+        
+        function logJSON(data) {
+            const pre = document.createElement('pre');
+            pre.textContent = JSON.stringify(data, null, 2);
+            resultsDiv.appendChild(pre);
+        }
+        
+        async function testAPI() {
+            resultsDiv.innerHTML = '<h2>API Test Results:</h2>';
+            log('Testing API connection to: ' + API_URL);
+            
+            try {
+                log('Fetching budget summary...');
+                const response = await fetch(API_URL + '/api/budget/summary');
+                log('Response status: ' + response.status, response.ok ? 'success' : 'error');
+                log('Response headers:');
+                logJSON({
+                    'Content-Type': response.headers.get('content-type'),
+                    'Access-Control-Allow-Origin': response.headers.get('access-control-allow-origin')
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('✓ Successfully fetched data!', 'success');
+                    log('Budget data:');
+                    logJSON(data);
+                } else {
+                    log('✗ Request failed with status ' + response.status, 'error');
+                }
+            } catch (error) {
+                log('✗ Error: ' + error.message, 'error');
+                log('This usually means:', 'info');
+                log('1. Browser blocked the request (CORS)', 'info');
+                log('2. Backend is not accessible from this browser', 'info');
+                log('3. Network connectivity issue', 'info');
+            }
+        }
+        
+        function testSSE() {
+            resultsDiv.innerHTML = '<h2>SSE Test Results:</h2>';
+            log('Testing SSE connection to: ' + API_URL + '/api/sse/subscribe');
+            
+            try {
+                const es = new EventSource(API_URL + '/api/sse/subscribe');
+                
+                es.onopen = () => {
+                    log('✓ SSE connection opened!', 'success');
+                };
+                
+                es.onerror = (error) => {
+                    log('✗ SSE connection error', 'error');
+                    log('Error details: ' + JSON.stringify(error), 'error');
+                    es.close();
+                };
+                
+                setTimeout(() => {
+                    es.close();
+                    log('SSE test complete (connection closed after 5 seconds)', 'info');
+                }, 5000);
+            } catch (error) {
+                log('✗ Error creating SSE: ' + error.message, 'error');
+            }
+        }
+        
+        // Auto-run API test on page load
+        window.addEventListener('load', () => {
+            setTimeout(testAPI, 1000);
+        });
+    </script>
+</body>
+</html>

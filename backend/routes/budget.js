@@ -37,14 +37,24 @@ module.exports = function (budgetService) {
     res.json(transaction);
   });
 
-  // Placeholder - upcoming bills (future enhancement)
+  // Upcoming bills
   router.get('/upcoming-bills', (req, res) => {
+    const FileStore = require('../storage/FileStore');
+    const billsStore = new FileStore('bills.json');
+    const bills = billsStore.read();
+    
+    // Filter to upcoming bills (within next 30 days)
     const now = new Date();
-    res.json([
-      { name: 'Rent', amount: 1200, dueDate: new Date(now.getFullYear(), now.getMonth(), 28).toISOString(), recurring: true },
-      { name: 'Internet', amount: 65, dueDate: new Date(now.getFullYear(), now.getMonth(), 15).toISOString(), recurring: true },
-      { name: 'Phone', amount: 45, dueDate: new Date(now.getFullYear(), now.getMonth(), 20).toISOString(), recurring: true },
-    ]);
+    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    
+    const upcomingBills = bills
+      .filter(bill => {
+        const dueDate = new Date(bill.dueDate);
+        return dueDate >= now && dueDate <= thirtyDaysFromNow;
+      })
+      .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+    
+    res.json(upcomingBills);
   });
 
   // Write endpoints (require auth)

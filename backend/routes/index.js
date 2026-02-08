@@ -26,7 +26,7 @@ module.exports = function mountRoutes(app, services) {
   app.use('/api/work', workRoutes(actionItemService));
   app.use('/api/budget', budgetRoutes(budgetService));
   app.use('/api/jobs', jobsRoutes);
-  app.use('/api/views', viewsRoutes(taskService, agentService));
+  app.use('/api/views', viewsRoutes(taskService, agentService, actionItemService));
   app.use('/api/activity', activityRoutes);
   app.use('/api/sse', sseRoutes(sseManager));
   app.use('/api/server', serverRoutes(serverStatusService));

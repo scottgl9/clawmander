@@ -11,7 +11,7 @@ export default function BudgetSummary() {
   if (loading) return <div className="text-gray-600 text-xs">Loading...</div>;
   if (error) return <div className="text-red-400 text-xs">{error}</div>;
 
-  const pct = data ? Math.round((data.totalSpent / data.budget) * 100) : 0;
+  const pct = data ? Math.round((data.totalSpent / data.totalBudget) * 100) : 0;
 
   return (
     <>

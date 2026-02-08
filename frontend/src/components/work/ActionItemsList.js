@@ -35,9 +35,9 @@ export default function ActionItemsList({ category }) {
                 {item.title}
               </span>
             </button>
-            {expandedId === item.id && item.description && (
-              <div className="ml-5 mt-1 text-xs text-gray-500 border-l border-gray-700 pl-2">
-                {item.description}
+            {expandedId === item.id && (item.details || item.description) && (
+              <div className="ml-5 mt-1 text-xs text-gray-400 border-l border-gray-700 pl-3 py-1 whitespace-pre-wrap">
+                {item.details || item.description}
               </div>
             )}
           </li>
