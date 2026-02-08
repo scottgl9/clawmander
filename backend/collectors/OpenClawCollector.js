@@ -61,15 +61,17 @@ class OpenClawCollector {
         id: this._nextId(),
         method: 'connect',
         params: {
+          minProtocol: 3,
+          maxProtocol: 3,
           client: {
             id: 'clawmander',
             version: '1.0.0',
             platform: process.platform,
-            mode: 'dashboard',
+            mode: 'observer',
           },
           role: 'operator',
           scopes: ['operator.read'],
-          auth: { token: config.openClaw.token },
+          auth: { token: config.openClaw.token || '' },
         },
       });
     });
@@ -185,6 +187,7 @@ class OpenClawCollector {
       clearTimeout(entry.timeout);
       this._pendingRequests.delete(msg.id);
       if (msg.error) {
+        console.error('[OpenClaw] Response error:', msg.error.code, msg.error.message);
         entry.reject(new Error(msg.error.message || 'RPC error'));
       } else {
         entry.resolve(msg.result);

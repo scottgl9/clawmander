@@ -5,8 +5,9 @@ Requires=clawmander-backend.service
 
 [Service]
 Type=simple
+Environment="PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin"
 WorkingDirectory=%h/sandbox/personal/clawmander/frontend
-ExecStart=/usr/bin/env npm run start
+ExecStart=/home/linuxbrew/.linuxbrew/bin/npm run start
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
