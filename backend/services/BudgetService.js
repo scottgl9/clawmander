@@ -57,12 +57,22 @@ class BudgetService {
     // Helper to round to 2 decimal places
     const round2 = (num) => Math.round(num * 100) / 100;
 
+    // Biweekly income (based on paycheck schedule)
+    // ~$4,151 per paycheck x 2 per month = ~$8,302/month average
+    const monthlyIncome = 8302.00;
+    const netCashFlow = round2(monthlyIncome - totalSpent);
+    const isPositive = netCashFlow > 0;
+
     return {
       month: currentMonth,
       monthName: new Date(currentMonth + '-01').toLocaleString('default', { month: 'long', year: 'numeric' }),
       totalBudget: round2(totalBudget),
       totalSpent: round2(totalSpent),
       remaining: round2(totalBudget - totalSpent),
+      income: round2(monthlyIncome),
+      netCashFlow: netCashFlow,
+      isPositive: isPositive,
+      savingsRate: totalSpent > 0 ? round2((netCashFlow / monthlyIncome) * 100) : 0,
       categories: categories.map(c => ({
         id: c.id,
         name: c.name,
@@ -180,6 +190,10 @@ class BudgetService {
     // Helper to round to 2 decimal places
     const round2 = (num) => Math.round(num * 100) / 100;
 
+    // Biweekly income (based on paycheck schedule)
+    // ~$4,151 per paycheck x 2 per month = ~$8,302/month average
+    const monthlyIncome = 8302.00;
+
     for (let i = months - 1; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthKey = date.toISOString().slice(0, 7);
@@ -187,6 +201,8 @@ class BudgetService {
 
       const totalBudget = categories.reduce((sum, c) => sum + c.budget, 0);
       const totalSpent = categories.reduce((sum, c) => sum + c.spent, 0);
+      const netCashFlow = round2(monthlyIncome - totalSpent);
+      const isPositive = netCashFlow > 0;
 
       result.push({
         month: date.toLocaleString('default', { month: 'short' }),
@@ -194,6 +210,10 @@ class BudgetService {
         monthKey,
         budget: round2(totalBudget),
         spent: round2(totalSpent),
+        income: round2(monthlyIncome),
+        netCashFlow: netCashFlow,
+        isPositive: isPositive,
+        savingsRate: totalSpent > 0 ? round2((netCashFlow / monthlyIncome) * 100) : 0,
       });
     }
 
