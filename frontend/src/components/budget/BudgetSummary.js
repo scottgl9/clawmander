@@ -7,6 +7,7 @@ import BudgetDetailModal from './BudgetDetailModal';
 export default function BudgetSummary() {
   const { data, loading, error } = useAPI(() => api.budget.getSummary());
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [expanded, setExpanded] = useState(false);
 
   if (loading) return <div className="text-gray-600 text-xs">Loading...</div>;
   if (error) return <div className="text-red-400 text-xs">{error}</div>;
@@ -17,7 +18,7 @@ export default function BudgetSummary() {
     <>
       <div className="bg-surface rounded-lg p-4 border border-gray-800">
         <h3 className="text-sm font-semibold text-white mb-3">Budget - {data?.monthName}</h3>
-        
+
         {/* Cash Flow Summary */}
         <div className="mb-3 p-3 rounded-lg bg-surface-light border border-gray-700">
           <div className="flex justify-between text-xs mb-2">
@@ -48,18 +49,28 @@ export default function BudgetSummary() {
           <span>${data?.remaining?.toFixed(2)} left</span>
         </div>
         <ProgressBar value={pct} className="mb-3" />
-        <div className="space-y-2">
-          {data?.categories?.map((cat) => (
-            <div
-              key={cat.name}
-              className="flex items-center justify-between text-xs cursor-pointer hover:bg-surface-light p-1 rounded transition-colors"
-              onClick={() => setSelectedCategory(cat)}
-            >
-              <span className="text-gray-400">{cat.name}</span>
-              <span className="text-gray-300">${cat.spent} / ${cat.budget}</span>
-            </div>
-          ))}
-        </div>
+
+        {expanded && (
+          <div className="space-y-2 mb-3">
+            {data?.categories?.map((cat) => (
+              <div
+                key={cat.name}
+                className="flex items-center justify-between text-xs cursor-pointer hover:bg-surface-light p-1 rounded transition-colors"
+                onClick={() => setSelectedCategory(cat)}
+              >
+                <span className="text-gray-400">{cat.name}</span>
+                <span className="text-gray-300">${cat.spent} / ${cat.budget}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+        >
+          {expanded ? 'Hide categories' : 'Show categories'}
+        </button>
       </div>
 
       <BudgetDetailModal

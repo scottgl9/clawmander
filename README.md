@@ -20,13 +20,17 @@ A real-time dashboard that aggregates data from OpenClaw, workspace files, finan
 
 ### 💼 Work View
 - Action items from MEMORY.md and daily notes
+- Expandable item lists (shows top 5, expand to 15)
+- Filters out completed items (view on My Done page)
 - Current work brief (meetings, priorities, blockers)
 - ThinPro status, Jira tickets, team updates
 
 ### 💰 Budget & Finance
-- Category breakdown (via Lunchflow API)
+- Income tracking and cash flow analysis
+- Collapsible category breakdown (via Lunchflow API)
 - 6-month spending trends with charts
 - Bill reminders and due dates
+- Savings rate calculation
 
 ### 📅 Upcoming Events
 - Bills due (with 7-day warning threshold)
@@ -144,6 +148,26 @@ Run Clawmander as systemd user services for production:
 ./service.sh status       # Check status
 ./service.sh logs         # View logs
 ./service.sh enable-boot  # Auto-start on boot
+```
+
+### Restarting Services
+
+After making code changes or rebuilding the frontend:
+
+```bash
+# Rebuild frontend (if changed)
+cd frontend && npm run build
+
+# Restart both services
+systemctl --user restart clawmander-frontend.service
+systemctl --user restart clawmander-backend.service
+
+# Or restart individually
+systemctl --user restart clawmander-frontend.service  # Just frontend
+systemctl --user restart clawmander-backend.service   # Just backend
+
+# Check service status
+systemctl --user status clawmander-frontend.service clawmander-backend.service
 ```
 
 See [Setup Guide](docs/SETUP.md) for details.
