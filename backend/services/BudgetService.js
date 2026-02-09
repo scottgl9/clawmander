@@ -1,12 +1,29 @@
 const FileStore = require('../storage/FileStore');
 const { createBudgetCategory } = require('../models/BudgetCategory');
 const { createTransaction } = require('../models/Transaction');
+const fs = require('fs');
+const path = require('path');
 
 class BudgetService {
   constructor(sseManager) {
     this.categoriesStore = new FileStore('budget-categories.json');
     this.transactionsStore = new FileStore('budget-transactions.json');
     this.sse = sseManager;
+    this.incomeFilePath = path.join(__dirname, '../storage/data/monthly-income.json');
+  }
+
+  // Get monthly income from cache file
+  getMonthlyIncome(monthKey) {
+    try {
+      if (fs.existsSync(this.incomeFilePath)) {
+        const data = JSON.parse(fs.readFileSync(this.incomeFilePath, 'utf8'));
+        const monthData = data.find(m => m.month === monthKey);
+        return monthData ? Math.round(monthData.income * 100) / 100 : 8302; // Fallback to average
+      }
+    } catch (err) {
+      console.error('Error reading monthly income:', err);
+    }
+    return 8302; // Fallback to average
   }
 
   // Categories
@@ -57,22 +74,25 @@ class BudgetService {
     // Helper to round to 2 decimal places
     const round2 = (num) => Math.round(num * 100) / 100;
 
-    // Biweekly income (based on paycheck schedule)
-    // ~$4,151 per paycheck x 2 per month = ~$8,302/month average
-    const monthlyIncome = 8302.00;
+    // Get actual monthly income from cache
+    const monthlyIncome = this.getMonthlyIncome(currentMonth);
     const netCashFlow = round2(monthlyIncome - totalSpent);
     const isPositive = netCashFlow > 0;
 
+    // Parse month correctly (avoid timezone issues)
+    const [yearNum, monthNum] = currentMonth.split('-');
+    const monthDate = new Date(parseInt(yearNum), parseInt(monthNum) - 1, 1);
+    
     return {
       month: currentMonth,
-      monthName: new Date(currentMonth + '-01').toLocaleString('default', { month: 'long', year: 'numeric' }),
+      monthName: monthDate.toLocaleString('default', { month: 'long', year: 'numeric' }),
       totalBudget: round2(totalBudget),
       totalSpent: round2(totalSpent),
       remaining: round2(totalBudget - totalSpent),
       income: round2(monthlyIncome),
       netCashFlow: netCashFlow,
       isPositive: isPositive,
-      savingsRate: totalSpent > 0 ? round2((netCashFlow / monthlyIncome) * 100) : 0,
+      savingsRate: monthlyIncome > 0 ? round2((netCashFlow / monthlyIncome) * 100) : 0,
       categories: categories.map(c => ({
         id: c.id,
         name: c.name,
@@ -190,10 +210,6 @@ class BudgetService {
     // Helper to round to 2 decimal places
     const round2 = (num) => Math.round(num * 100) / 100;
 
-    // Biweekly income (based on paycheck schedule)
-    // ~$4,151 per paycheck x 2 per month = ~$8,302/month average
-    const monthlyIncome = 8302.00;
-
     for (let i = months - 1; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthKey = date.toISOString().slice(0, 7);
@@ -201,6 +217,9 @@ class BudgetService {
 
       const totalBudget = categories.reduce((sum, c) => sum + c.budget, 0);
       const totalSpent = categories.reduce((sum, c) => sum + c.spent, 0);
+      
+      // Get actual monthly income from cache
+      const monthlyIncome = this.getMonthlyIncome(monthKey);
       const netCashFlow = round2(monthlyIncome - totalSpent);
       const isPositive = netCashFlow > 0;
 
@@ -213,7 +232,7 @@ class BudgetService {
         income: round2(monthlyIncome),
         netCashFlow: netCashFlow,
         isPositive: isPositive,
-        savingsRate: totalSpent > 0 ? round2((netCashFlow / monthlyIncome) * 100) : 0,
+        savingsRate: monthlyIncome > 0 ? round2((netCashFlow / monthlyIncome) * 100) : 0,
       });
     }
 
