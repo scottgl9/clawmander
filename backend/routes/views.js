@@ -29,16 +29,31 @@ module.exports = function (taskService, agentService, actionItemService) {
     const personal = getTopPriorityItems(highPriorityItems.filter(i => i.category === 'personal'), 10);
     const work = getTopPriorityItems(highPriorityItems.filter(i => i.category === 'work'), 10);
     
+    // Get daily tasks for today
+    const FileStore = require('../storage/FileStore');
+    const dailyTasksStore = new FileStore('daily-tasks.json');
+    const tasks = dailyTasksStore.read().filter(t => t.date === today);
+
+    // Calculate stats by status
+    const byStatus = {
+      active: tasks.filter(t => !t.completed).length,
+      done: tasks.filter(t => t.completed).length,
+    };
+    
     res.json({
       date: today,
       items: [...personal, ...work],
       personal,
       work,
+      tasks, // Added daily tasks
       agents,
       stats: {
         total: highPriorityItems.length,
         personal: highPriorityItems.filter(i => i.category === 'personal').length,
         work: highPriorityItems.filter(i => i.category === 'work').length,
+        tasks: tasks.length,
+        completedTasks: tasks.filter(t => t.completed).length,
+        byStatus, // Added for frontend compatibility
       }
     });
   });
