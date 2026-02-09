@@ -17,15 +17,24 @@ export default function ActionItemsList({ category }) {
   const fetcher = FETCHERS[category] || (() => api.work.getActionItems());
   const { data, loading, error } = useAPI(fetcher);
   const [expandedId, setExpandedId] = useState(null);
+  const [showAll, setShowAll] = useState(false);
 
   if (loading) return <div className="text-gray-600 text-xs">Loading...</div>;
   if (error) return <div className="text-red-400 text-xs">{error}</div>;
+
+  // Filter out completed items
+  const activeItems = data?.filter(item => !item.done) || [];
+
+  // Show top 5 by default, up to 15 when expanded
+  const displayItems = showAll ? activeItems.slice(0, 15) : activeItems.slice(0, 5);
+  const hasMore = activeItems.length > 5;
+  const hiddenCount = activeItems.length - displayItems.length;
 
   return (
     <div className="bg-surface rounded-lg p-4 border border-gray-800">
       <h3 className="text-sm font-semibold text-white mb-3">{TITLES[category] || 'Action Items'}</h3>
       <ul className="space-y-2">
-        {data?.map((item) => (
+        {displayItems.map((item) => (
           <li key={item.id}>
             <button
               className="flex items-start gap-2 w-full text-left"
@@ -44,6 +53,14 @@ export default function ActionItemsList({ category }) {
           </li>
         ))}
       </ul>
+      {hasMore && (
+        <button
+          onClick={() => setShowAll(!showAll)}
+          className="mt-3 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+        >
+          {showAll ? 'Show less' : `Show ${hiddenCount} more...`}
+        </button>
+      )}
     </div>
   );
 }

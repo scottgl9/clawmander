@@ -288,6 +288,32 @@ export default function MyComponent() {
 - Medium: `gap-4`, `p-4`, `mb-4`
 - Large: `gap-6`, `p-6`, `mb-6`
 
+### Recent UI Improvements
+
+**Dashboard Optimization** (2026-02-08):
+- **Work/Personal Items**:
+  - Filters out completed items (shown on `/completed/mine` instead)
+  - Shows top 5 items by default
+  - "Show N more..." button expands to display up to 15 items
+  - Cleaner, less cluttered main view
+
+- **Budget Widget**:
+  - Collapsed by default to save space
+  - Cash flow summary always visible
+  - "Show categories" / "Hide categories" toggle
+  - Detailed breakdown on demand
+
+These patterns can be reused for other expandable widgets:
+```javascript
+const [expanded, setExpanded] = useState(false);
+const displayItems = expanded ? items.slice(0, 15) : items.slice(0, 5);
+
+// Toggle button
+<button onClick={() => setExpanded(!expanded)}>
+  {expanded ? 'Show less' : `Show ${hiddenCount} more...`}
+</button>
+```
+
 ## API Development
 
 ### Adding API Method
@@ -491,6 +517,52 @@ npm start  # Production server
 ```bash
 cd backend
 NODE_ENV=production npm start
+```
+
+### Restarting Services (Systemd)
+
+After making code changes in production:
+
+**Quick restart** (both services):
+```bash
+# Rebuild frontend if needed
+cd frontend && npm run build
+
+# Restart both services
+systemctl --user restart clawmander-frontend.service clawmander-backend.service
+
+# Verify they're running
+systemctl --user status clawmander-frontend.service clawmander-backend.service
+```
+
+**Individual service restart**:
+```bash
+# Just frontend
+systemctl --user restart clawmander-frontend.service
+
+# Just backend
+systemctl --user restart clawmander-backend.service
+```
+
+**View logs after restart**:
+```bash
+# Follow logs in real-time
+journalctl --user -u clawmander-frontend.service -f
+journalctl --user -u clawmander-backend.service -f
+
+# View last 50 lines
+journalctl --user -u clawmander-backend.service -n 50
+```
+
+**Troubleshooting restart issues**:
+```bash
+# If backend fails with "address in use"
+lsof -ti:3001 | xargs kill -9  # Kill process on port 3001
+systemctl --user restart clawmander-backend.service
+
+# If frontend fails with "address in use"
+lsof -ti:3000 | xargs kill -9  # Kill process on port 3000
+systemctl --user restart clawmander-frontend.service
 ```
 
 ### Environment Variables
