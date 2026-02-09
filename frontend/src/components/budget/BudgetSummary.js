@@ -16,9 +16,35 @@ export default function BudgetSummary() {
   return (
     <>
       <div className="bg-surface rounded-lg p-4 border border-gray-800">
-        <h3 className="text-sm font-semibold text-white mb-3">Budget - {data?.month}</h3>
+        <h3 className="text-sm font-semibold text-white mb-3">Budget - {data?.monthName}</h3>
+        
+        {/* Cash Flow Summary */}
+        <div className="mb-3 p-3 rounded-lg bg-surface-light border border-gray-700">
+          <div className="flex justify-between text-xs mb-2">
+            <span className="text-gray-400">Income</span>
+            <span className="text-green-400">${data?.income?.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-xs mb-2">
+            <span className="text-gray-400">Spent</span>
+            <span className="text-red-400">${data?.totalSpent?.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-xs pt-2 border-t border-gray-600">
+            <span className="font-semibold text-white">Net Cash Flow</span>
+            <span className={`font-semibold ${data?.isPositive ? 'text-green-400' : 'text-red-400'}`}>
+              {data?.isPositive ? '+' : '-'}${Math.abs(data?.netCashFlow || 0).toFixed(2)}
+              {data?.isPositive ? ' ✅' : ' ⚠️'}
+            </span>
+          </div>
+          <div className="flex justify-between text-xs mt-1">
+            <span className="text-gray-500">Savings Rate</span>
+            <span className={`${data?.isPositive ? 'text-green-400' : 'text-red-400'}`}>
+              {data?.savingsRate?.toFixed(1)}%
+            </span>
+          </div>
+        </div>
+
         <div className="flex justify-between text-xs text-gray-400 mb-1">
-          <span>${data?.totalSpent?.toFixed(2)} spent</span>
+          <span>${data?.totalSpent?.toFixed(2)} of budget</span>
           <span>${data?.remaining?.toFixed(2)} left</span>
         </div>
         <ProgressBar value={pct} className="mb-3" />
