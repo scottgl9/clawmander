@@ -54,12 +54,14 @@ export default function Dashboard() {
           <span className="text-sm text-gray-400">{dot.label}</span>
         </div>
 
-        {/* 3-column widget grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Work column */}
-          <div className="space-y-4">
-            <ActionItemsList category="work" />
-            <ActionItemsList category="personal" />
+        {/* Widget grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          {/* Work & Personal - spans 2 columns */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ActionItemsList category="work" />
+              <ActionItemsList category="personal" />
+            </div>
             <WorkBrief />
           </div>
 
