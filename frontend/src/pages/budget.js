@@ -26,12 +26,12 @@ export default function BudgetPage() {
         {summary && (
           <div className="space-y-6">
             {/* Overview Cards */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-surface rounded-lg p-6 border border-gray-800">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-surface rounded-lg p-4 sm:p-6 border border-gray-800">
                 <div className="text-xs text-gray-500 uppercase mb-1">Total Budget</div>
                 <div className="text-3xl font-bold text-white">${summary.totalBudget?.toFixed(2)}</div>
               </div>
-              <div className="bg-surface rounded-lg p-6 border border-gray-800">
+              <div className="bg-surface rounded-lg p-4 sm:p-6 border border-gray-800">
                 <div className="text-xs text-gray-500 uppercase mb-1">Total Spent</div>
                 <div className={`text-3xl font-bold ${summary.totalSpent > summary.totalBudget ? 'text-red-400' : 'text-blue-400'}`}>
                   ${summary.totalSpent?.toFixed(2)}
@@ -40,7 +40,7 @@ export default function BudgetPage() {
                   {Math.round((summary.totalSpent / summary.totalBudget) * 100)}% of budget
                 </div>
               </div>
-              <div className="bg-surface rounded-lg p-6 border border-gray-800">
+              <div className="bg-surface rounded-lg p-4 sm:p-6 border border-gray-800">
                 <div className="text-xs text-gray-500 uppercase mb-1">Remaining</div>
                 <div className={`text-3xl font-bold ${summary.remaining < 0 ? 'text-red-400' : 'text-green-400'}`}>
                   ${summary.remaining?.toFixed(2)}
@@ -49,7 +49,7 @@ export default function BudgetPage() {
             </div>
 
             {/* Overall Progress */}
-            <div className="bg-surface rounded-lg p-6 border border-gray-800">
+            <div className="bg-surface rounded-lg p-4 sm:p-6 border border-gray-800">
               <h3 className="text-sm font-semibold text-white mb-4">Overall Budget Usage</h3>
               <ProgressBar value={Math.round((summary.totalSpent / summary.totalBudget) * 100)} className="mb-2" />
               <div className="flex justify-between text-xs text-gray-500">
@@ -59,7 +59,7 @@ export default function BudgetPage() {
             </div>
 
             {/* Categories */}
-            <div className="bg-surface rounded-lg p-6 border border-gray-800">
+            <div className="bg-surface rounded-lg p-4 sm:p-6 border border-gray-800">
               <h3 className="text-sm font-semibold text-white mb-4">Categories</h3>
               <div className="space-y-4">
                 {summary.categories?.map((category) => {
@@ -98,7 +98,7 @@ export default function BudgetPage() {
 
             {/* Cash Flow Trends */}
             {trends && trends.length > 0 && (
-              <div className="bg-surface rounded-lg p-6 border border-gray-800">
+              <div className="bg-surface rounded-lg p-4 sm:p-6 border border-gray-800">
                 <h3 className="text-sm font-semibold text-white mb-4">6-Month Cash Flow</h3>
                 
                 {/* Monthly breakdown table */}
@@ -150,7 +150,7 @@ export default function BudgetPage() {
 
             {/* Recent Transactions */}
             {transactions && transactions.length > 0 && (
-              <div className="bg-surface rounded-lg p-6 border border-gray-800">
+              <div className="bg-surface rounded-lg p-4 sm:p-6 border border-gray-800">
                 <h3 className="text-sm font-semibold text-white mb-4">Recent Transactions</h3>
                 <div className="space-y-2">
                   {transactions.slice(0, 10).map((txn) => {

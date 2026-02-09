@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export default function Header({ connected }) {
+export default function Header({ connected, onMenuToggle }) {
   const [time, setTime] = useState(null);
   const [heartbeatData, setHeartbeatData] = useState(null);
   const [countdown, setCountdown] = useState(null);
@@ -38,7 +38,7 @@ export default function Header({ connected }) {
       if (heartbeatData && lastFetchTime) {
         const elapsedSinceLastFetch = Math.floor((Date.now() - lastFetchTime) / 1000);
         const calculatedCountdown = heartbeatData.secondsUntilNext - elapsedSinceLastFetch;
-        
+
         // If countdown goes negative, it means we're past the expected heartbeat time
         // Keep it at 0 until the next API refresh updates with the new nextHeartbeat
         setCountdown(calculatedCountdown > 0 ? calculatedCountdown : 0);
@@ -65,18 +65,27 @@ export default function Header({ connected }) {
   };
 
   return (
-    <header className="flex items-center justify-between px-6 py-3 bg-surface border-b border-gray-800">
+    <header className="flex items-center justify-between px-3 md:px-6 py-3 bg-surface border-b border-gray-800">
       <div className="flex items-center gap-3">
+        <button
+          onClick={onMenuToggle}
+          className="md:hidden p-1 text-gray-400 hover:text-white transition-colors"
+          aria-label="Open menu"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+        </button>
         <h1 className="text-xl font-bold text-white tracking-wide">Clawmander</h1>
-        <span className="text-xs text-gray-500">Command Center</span>
+        <span className="hidden sm:inline text-xs text-gray-500">Command Center</span>
       </div>
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500 pulse-glow'}`} />
-          <span className="text-xs text-gray-400">{connected ? 'Connected' : 'Disconnected'}</span>
+          <span className="hidden sm:inline text-xs text-gray-400">{connected ? 'Connected' : 'Disconnected'}</span>
         </div>
         {countdown !== null && (
-          <div className="flex items-center gap-2 px-3 py-1 bg-surface-light rounded border border-gray-700">
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-surface-light rounded border border-gray-700">
             <span className="text-xs text-gray-500">Next heartbeat:</span>
             <span className={`text-sm font-mono font-semibold ${getCountdownColor()}`}>
               {formatCountdown(countdown)}
