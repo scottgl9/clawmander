@@ -96,10 +96,43 @@ export default function BudgetPage() {
               </div>
             </div>
 
-            {/* Spending Trends */}
+            {/* Cash Flow Trends */}
             {trends && trends.length > 0 && (
               <div className="bg-surface rounded-lg p-6 border border-gray-800">
-                <h3 className="text-sm font-semibold text-white mb-4">6-Month Spending Trend</h3>
+                <h3 className="text-sm font-semibold text-white mb-4">6-Month Cash Flow</h3>
+                
+                {/* Monthly breakdown table */}
+                <div className="mb-6 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-700">
+                        <th className="text-left py-2 text-gray-400 font-medium">Month</th>
+                        <th className="text-right py-2 text-gray-400 font-medium">Income</th>
+                        <th className="text-right py-2 text-gray-400 font-medium">Spent</th>
+                        <th className="text-right py-2 text-gray-400 font-medium">Net</th>
+                        <th className="text-right py-2 text-gray-400 font-medium">Savings</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {trends.map((month) => (
+                        <tr key={month.monthKey} className="border-b border-gray-800">
+                          <td className="py-3 text-white">{month.monthFull}</td>
+                          <td className="text-right text-green-400">${month.income?.toFixed(2)}</td>
+                          <td className="text-right text-red-400">${month.spent?.toFixed(2)}</td>
+                          <td className={`text-right font-semibold ${month.isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                            {month.isPositive ? '+' : ''}${month.netCashFlow?.toFixed(2)}
+                            {month.isPositive ? ' ✅' : ' ⚠️'}
+                          </td>
+                          <td className={`text-right ${month.isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                            {month.savingsRate?.toFixed(1)}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Chart */}
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={trends}>
                     <XAxis dataKey="month" tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
