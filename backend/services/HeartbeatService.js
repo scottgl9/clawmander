@@ -44,10 +44,22 @@ class HeartbeatService {
     const now = new Date();
     const interval = data.heartbeatInterval || 300;
     const nextHeartbeat = new Date(now.getTime() + interval * 1000).toISOString();
+
+    // Determine status based on tasks and alert state
+    let status;
+    if (data.status === 'ALERT') {
+      status = 'error';
+    } else if (data.tasks && data.tasks.length > 0) {
+      status = 'active';
+    } else {
+      status = 'idle';
+    }
+
     this.agentService.upsert({
       id: data.agentId,
       name: data.agentName || data.agentId,
-      status: data.status === 'ALERT' ? 'error' : 'active',
+      status,
+      currentTask: data.tasks && data.tasks.length > 0 ? data.tasks[0] : null,
       lastHeartbeat: now.toISOString(),
       nextHeartbeat,
       heartbeatInterval: interval,

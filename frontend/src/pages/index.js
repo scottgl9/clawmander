@@ -14,8 +14,10 @@ import { api } from '../lib/api';
 function deriveAgentStatus(agents) {
   if (!agents || agents.length === 0) return 'offline';
   if (agents.some((a) => a.status === 'error')) return 'error';
-  if (agents.some((a) => a.status === 'active')) return 'active';
-  if (agents.some((a) => a.status === 'idle')) return 'idle';
+  // Check if any agent is truly active (has a current task)
+  if (agents.some((a) => a.status === 'active' && a.currentTask)) return 'active';
+  // Check if any agent is marked idle or active but with no task
+  if (agents.some((a) => a.status === 'idle' || (a.status === 'active' && !a.currentTask))) return 'idle';
   return 'offline';
 }
 
