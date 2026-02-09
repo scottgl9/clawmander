@@ -33,7 +33,7 @@ export default function ActionItemsList({ category }) {
             >
               <span className={`mt-0.5 w-3 h-3 rounded border flex-shrink-0 ${item.done ? 'bg-green-500 border-green-500' : 'border-gray-600'}`} />
               <span className={`text-sm ${item.done ? 'text-gray-600 line-through' : 'text-gray-300'}`}>
-                {item.title}
+                <SimpleMarkdown content={item.title} />
               </span>
             </button>
             {expandedId === item.id && (item.details || item.description) && (

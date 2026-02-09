@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import SimpleMarkdown from '../shared/SimpleMarkdown';
 
 export default function JobCard({ job }) {
   const [expanded, setExpanded] = useState(false);
@@ -15,7 +16,9 @@ export default function JobCard({ job }) {
     >
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm text-white font-medium">{job.title}</div>
+          <div className="text-sm text-white font-medium">
+            <SimpleMarkdown content={job.title} />
+          </div>
           <div className="text-xs text-gray-500">{job.company} - {job.location}</div>
         </div>
         <div className="flex items-center gap-3">
@@ -28,7 +31,9 @@ export default function JobCard({ job }) {
       {expanded && (
         <div className="mt-2 pl-1">
           {job.summary && (
-            <p className="text-xs text-gray-400 mb-2">{job.summary}</p>
+            <div className="text-xs text-gray-400 mb-2">
+              <SimpleMarkdown content={job.summary} />
+            </div>
           )}
           {job.url && job.url !== '#' ? (
             <a
