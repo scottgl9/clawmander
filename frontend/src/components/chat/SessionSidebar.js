@@ -37,6 +37,7 @@ export default function SessionSidebar({
   onReload,
   onNewSession,
   connected,
+  models = [],
 }) {
   const [showNewSession, setShowNewSession] = useState(false);
 
@@ -165,9 +166,12 @@ export default function SessionSidebar({
       {activeSession && (() => {
         const s = sessions.find((x) => (x.key || x.sessionKey) === activeSession);
         if (!s?.model) return null;
+        const modelMeta = models.find((m) => m.id === s.model);
+        const alias = modelMeta?.alias || null;
+        const label = alias || (modelMeta?.provider ? `${modelMeta.provider}/${s.model}` : s.model);
         return (
-          <div className="px-3 py-2 border-t border-gray-800 text-xs text-gray-600 truncate">
-            {s.model}
+          <div className="px-3 py-2 border-t border-gray-800 text-xs text-gray-600 truncate" title={`${modelMeta?.provider || ''}/${s.model}`}>
+            {label}
           </div>
         );
       })()}

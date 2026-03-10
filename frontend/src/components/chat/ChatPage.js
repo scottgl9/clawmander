@@ -104,6 +104,7 @@ export default function ChatPage({ onConnectionChange }) {
           onSelect={switchSession}
           onReload={loadSessions}
           onNewSession={createSession}
+          models={models}
         />
         <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">
           No sessions match the current filter
@@ -125,6 +126,7 @@ export default function ChatPage({ onConnectionChange }) {
         onSelect={switchSession}
         onReload={loadSessions}
         onNewSession={createSession}
+        models={models}
       />
 
       {/* Main chat area */}
