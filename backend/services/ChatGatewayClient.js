@@ -345,22 +345,45 @@ class ChatGatewayClient {
   _handleChatEvent(payload) {
     const { state, runId, sessionKey, seq } = payload;
 
+    // Use chat events as a reliable fallback for agent activity tracking.
+    // The 'agent' lifecycle events may not always yield a parseable agentId,
+    // but chat events are guaranteed to fire during streaming.
+    const agentId = this._extractAgentId(sessionKey);
+
     switch (state) {
       case 'delta': {
         const text = this._extractText(payload.message);
         this.sse.broadcast('chat.delta', { sessionKey, runId, text, seq });
+        // Mark agent as working on first delta
+        if (agentId && !this._activeRuns.has(agentId)) {
+          this._touchAgent(agentId);
+          this._activeRuns.set(agentId, { runId, sessionKey, startedAt: Date.now() });
+          this.sse.broadcast('agent.status', { agentId, isWorking: true, runId, sessionKey });
+        }
         break;
       }
       case 'final': {
         const text = this._extractText(payload.message);
         this.sse.broadcast('chat.final', { sessionKey, runId, text, usage: payload.usage || null });
+        if (agentId) {
+          this._activeRuns.delete(agentId);
+          this.sse.broadcast('agent.status', { agentId, isWorking: false, runId, sessionKey });
+        }
         break;
       }
       case 'error':
         this.sse.broadcast('chat.error', { sessionKey, runId, error: payload.errorMessage || 'Unknown error' });
+        if (agentId) {
+          this._activeRuns.delete(agentId);
+          this.sse.broadcast('agent.status', { agentId, isWorking: false, runId, sessionKey });
+        }
         break;
       case 'aborted':
         this.sse.broadcast('chat.aborted', { sessionKey, runId });
+        if (agentId) {
+          this._activeRuns.delete(agentId);
+          this.sse.broadcast('agent.status', { agentId, isWorking: false, runId, sessionKey });
+        }
         break;
       default:
         break;

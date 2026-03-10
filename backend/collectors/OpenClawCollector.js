@@ -254,10 +254,37 @@ class OpenClawCollector {
     }
   }
 
+  _extractAgentIdFromSession(sessionKey) {
+    if (!sessionKey) return null;
+    const parts = sessionKey.split(':');
+    // agent:<agentId>:... or clawmander:<agentId>:...
+    if (parts.length >= 2 && (parts[0] === 'agent' || parts[0] === 'clawmander')) {
+      return parts[1];
+    }
+    return null;
+  }
+
   _handleEvent(msg) {
     const { event, payload } = msg;
     switch (event) {
-      case 'agent':
+      case 'agent': {
+        const p = payload || {};
+        // Gateway sends agent events as lifecycle stream: {runId, stream, data:{phase}, sessionKey}
+        // The payload has NO direct agentId — extract from sessionKey
+        if (p.stream === 'lifecycle' && p.data?.phase) {
+          const agentId = this._extractAgentIdFromSession(p.sessionKey);
+          if (agentId) {
+            const synth = { agentId, runId: p.runId, sessionKey: p.sessionKey, name: agentId };
+            if (p.data.phase === 'start') this._handleRunStart(synth);
+            else if (p.data.phase === 'end') this._handleRunEnd(synth);
+            else if (p.data.phase === 'error') this._handleRunError({ ...synth, error: p.data.error });
+          }
+        } else {
+          // Legacy format with direct agentId field
+          this._handleAgentEvent(p);
+        }
+        break;
+      }
       case 'presence':
         this._handleAgentEvent(payload || {});
         break;

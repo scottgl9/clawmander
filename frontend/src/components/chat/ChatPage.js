@@ -17,12 +17,12 @@ function filterSessions(sessions, filter) {
   if (filter === 'all') {
     return sessions.filter((s) => !getSessionKey(s).includes(':cron:'));
   }
-  // direct: only clawmander:<agent>:<number> sessions
+  // direct: only agent:<agentId>:clawmander:<number> sessions (created via clawmander UI)
   return sessions.filter((s) => {
     const key = getSessionKey(s);
-    if (!key.startsWith('clawmander:')) return false;
-    const label = key.split(':')[2] || '';
-    return /^\d+$/.test(label);
+    if (!key.startsWith('agent:')) return false;
+    const match = key.match(/^agent:[^:]+:clawmander:(\d+)$/);
+    return match !== null;
   });
 }
 
