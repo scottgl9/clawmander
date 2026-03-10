@@ -1,6 +1,7 @@
 const WebSocket = require('ws');
 const config = require('../config/config');
 const { parseSessionKey } = require('../models/Task');
+const { identity: deviceIdentity, buildAuthPayloadV3, sign: signPayload, publicKeyRawBase64Url } = require('../services/DeviceIdentity');
 
 class OpenClawCollector {
   constructor(agentService, sseManager, serverStatusService, taskService) {
@@ -112,34 +113,68 @@ class OpenClawCollector {
     });
   }
 
-  _sendConnectFrame(challenge) {
+  _sendConnectFrame(nonce) {
     const id = this._nextId();
     this._connectReqId = id;
+
+    const scopes = ['operator.read'];
+    const role = 'operator';
+    const token = config.openClaw.token || '';
+    const signedAtMs = Date.now();
+
+    const clientId = 'gateway-client';
+    const clientMode = 'backend';
+
+    const device = (() => {
+      if (!nonce) return undefined;
+      const payload = buildAuthPayloadV3({
+        deviceId: deviceIdentity.deviceId,
+        clientId,
+        clientMode,
+        role,
+        scopes,
+        signedAtMs,
+        token,
+        nonce,
+        platform: process.platform,
+        deviceFamily: 'node',
+      });
+      return {
+        id: deviceIdentity.deviceId,
+        publicKey: publicKeyRawBase64Url(deviceIdentity.publicKeyPem),
+        signature: signPayload(deviceIdentity.privateKeyPem, payload),
+        signedAt: signedAtMs,
+        nonce,
+      };
+    })();
 
     const params = {
       minProtocol: 3,
       maxProtocol: 3,
       client: {
-        id: 'cli',
+        id: clientId,
         version: '1.0.0',
         platform: process.platform,
-        mode: 'cli',
+        mode: clientMode,
+        deviceFamily: 'node',
       },
-      role: 'operator',
-      scopes: ['operator.read'],
-      auth: { token: config.openClaw.token || '' },
+      role,
+      scopes,
+      auth: { token },
+      ...(device ? { device } : {}),
     };
 
     this._sendRaw({ type: 'req', id, method: 'connect', params });
   }
 
-  _handleChallenge(msg) {
+  _handleChallenge(payload) {
     console.log('[OpenClaw] Received challenge, responding with connect frame...');
     if (this._challengeTimer) {
       clearTimeout(this._challengeTimer);
       this._challengeTimer = null;
     }
-    this._sendConnectFrame(msg);
+    const nonce = (typeof payload?.nonce === 'string' && payload.nonce.trim()) ? payload.nonce.trim() : null;
+    this._sendConnectFrame(nonce);
   }
 
   _scheduleReconnect() {
