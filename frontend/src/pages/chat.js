@@ -6,10 +6,8 @@ export default function ChatPageRoute() {
   const [connected, setConnected] = useState(false);
 
   return (
-    <Layout connected={connected}>
-      <div className="h-full -m-3 md:-m-6">
-        <ChatPage onConnectionChange={setConnected} />
-      </div>
+    <Layout connected={connected} noPadding>
+      <ChatPage onConnectionChange={setConnected} />
     </Layout>
   );
 }

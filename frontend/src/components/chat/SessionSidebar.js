@@ -59,7 +59,7 @@ export default function SessionSidebar({
   };
 
   return (
-    <div className="w-52 flex-shrink-0 bg-gray-900 border-r border-gray-800 flex flex-col">
+    <div className="w-full md:w-52 flex-shrink-0 bg-gray-900 border-r border-gray-800 flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-3 border-b border-gray-800">
         <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Sessions</span>
