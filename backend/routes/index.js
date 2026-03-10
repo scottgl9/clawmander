@@ -9,9 +9,12 @@ const sseRoutes = require('./sse');
 const serverRoutes = require('./server');
 const chatRoutes = require('./chat');
 const personaSyncRoutes = require('./personasync');
+const cronRoutes = require('./cron');
+const feedsRoutes = require('./feeds');
+const memoryRoutes = require('./memory');
 
 module.exports = function mountRoutes(app, services) {
-  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService } = services;
+  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService, cronService, memoryService } = services;
 
   app.use('/api/agents', agentsRoutes(agentService, heartbeatService));
 
@@ -34,4 +37,7 @@ module.exports = function mountRoutes(app, services) {
   app.use('/api/server', serverRoutes(serverStatusService));
   app.use('/api/chat', chatRoutes(chatGatewayClient, chatService));
   app.use('/api', personaSyncRoutes(personaSyncService));
+  app.use('/api/cron', cronRoutes(cronService));
+  app.use('/api/feeds', feedsRoutes(cronService));
+  app.use('/api/memory', memoryRoutes(memoryService));
 };

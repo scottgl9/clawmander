@@ -40,7 +40,20 @@ export const api = {
   views: {
     getDaily: () => fetchJSON('/api/views/daily'),
     getWeekly: () => fetchJSON('/api/views/weekly'),
-    getMonthly: () => fetchJSON('/api/views/monthly'),
+  },
+  cron: {
+    getJobs: () => fetchJSON('/api/cron/jobs'),
+    getJobRuns: (jobId, limit = 20) => fetchJSON(`/api/cron/jobs/${jobId}/runs?limit=${limit}`),
+  },
+  feeds: {
+    getAll: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return fetchJSON(`/api/feeds${qs ? '?' + qs : ''}`);
+    },
+  },
+  memory: {
+    getWeeks: (limit = 12) => fetchJSON(`/api/memory/weeks?limit=${limit}`),
+    getWeek: (weekId) => fetchJSON(`/api/memory/weeks/${weekId}`),
   },
   server: {
     getStatus: () => fetchJSON('/api/server/status'),

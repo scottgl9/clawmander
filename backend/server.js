@@ -13,6 +13,8 @@ const OpenClawCollector = require('./collectors/OpenClawCollector');
 const ChatGatewayClient = require('./services/ChatGatewayClient');
 const ChatService = require('./services/ChatService');
 const PersonaSyncService = require('./services/PersonaSyncService');
+const CronService = require('./services/CronService');
+const MemoryService = require('./services/MemoryService');
 const mountRoutes = require('./routes');
 const { activityLogger } = require('./middleware/logger');
 
@@ -39,6 +41,8 @@ const serverStatusService = new ServerStatusService(sseManager);
 const chatGatewayClient = new ChatGatewayClient(sseManager, taskService);
 const chatService = new ChatService(chatGatewayClient);
 const personaSyncService = new PersonaSyncService();
+const cronService = new CronService(sseManager, config.openClawHome);
+const memoryService = new MemoryService();
 
 // Wire chat events into ChatService for message history tracking
 sseManager._origBroadcast = sseManager.broadcast.bind(sseManager);
@@ -52,7 +56,7 @@ sseManager.broadcast = function (event, data) {
 };
 
 // Routes
-mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService });
+mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService, cronService, memoryService });
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -152,6 +156,9 @@ collector.start();
 
 // Start Chat gateway client (separate WS connection with write scopes)
 chatGatewayClient.start();
+
+// Start CronService file watcher
+cronService.startWatcher();
 
 // Start server
 app.listen(config.port, '0.0.0.0', () => {

@@ -6,6 +6,8 @@ import TrendChart from '../components/budget/TrendChart';
 import UpcomingBills from '../components/budget/UpcomingBills';
 import JobsList from '../components/jobs/JobsList';
 import ActivityLog from '../components/activity/ActivityLog';
+import RecentFeeds from '../components/shared/RecentFeeds';
+import CronMonitor from '../components/shared/CronMonitor';
 import { useSSE } from '../hooks/useSSE';
 
 export default function Dashboard() {
@@ -14,6 +16,12 @@ export default function Dashboard() {
   return (
     <Layout connected={connected}>
       <div className="space-y-6">
+
+        {/* Feeds + Cron row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <RecentFeeds limit={5} />
+          <CronMonitor />
+        </div>
 
         {/* Widget grid */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">

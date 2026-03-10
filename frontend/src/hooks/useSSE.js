@@ -27,6 +27,7 @@ export function useSSE(onEvent) {
       'chat.delta', 'chat.final', 'chat.error', 'chat.aborted',
       'chat.approval', 'chat.subagent',
       'agent.status', 'agent.status.snapshot',
+      'feed.new', 'cron.status',
     ];
     events.forEach((evt) => {
       es.addEventListener(evt, (e) => {
