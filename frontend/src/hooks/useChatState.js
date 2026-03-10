@@ -68,12 +68,8 @@ export function useChatState() {
         const { sessionKey, runId, text } = event.data;
         if (!text) break;
 
-        // Accumulate streaming content
-        if (streamingRef.current.runId !== runId) {
-          streamingRef.current = { runId, content: text };
-        } else {
-          streamingRef.current.content += text;
-        }
+        // Each delta payload carries the cumulative text so far — replace, don't append
+        streamingRef.current = { runId, content: text };
         setStreamingRunId(runId);
         setStreamingContent(streamingRef.current.content);
 

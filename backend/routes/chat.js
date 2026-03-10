@@ -9,6 +9,17 @@ const SYSTEM_USERNAME = os.userInfo().username;
 function normalizeGatewayHistory(result, sessionKey) {
   const raw = Array.isArray(result) ? result : (result?.messages || result?.items || result?.turns || []);
   return raw
+    // Only show user and assistant turns — skip tool/system/tool_result roles
+    .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
+    // For user turns, skip if content is entirely tool_result blocks (file reads, tool outputs)
+    .filter((msg) => {
+      if (msg.role !== 'user') return true;
+      const c = msg.content;
+      if (Array.isArray(c)) {
+        return c.some((b) => b.type !== 'tool_result');
+      }
+      return true;
+    })
     .map((msg, i) => ({
       id: msg.id || `gw-${i}-${Date.now()}`,
       sessionKey,
