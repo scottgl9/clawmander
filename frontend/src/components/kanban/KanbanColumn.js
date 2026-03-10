@@ -1,7 +1,7 @@
 import { STATUS_COLORS } from '../../lib/constants';
 import KanbanCard from './KanbanCard';
 
-export default function KanbanColumn({ status, label, tasks, agents, heartbeats, onTaskClick }) {
+export default function KanbanColumn({ status, label, tasks, agents, onTaskClick }) {
   const color = STATUS_COLORS[status] || '#6b7280';
 
   return (
@@ -22,8 +22,7 @@ export default function KanbanColumn({ status, label, tasks, agents, heartbeats,
         )}
         {tasks.map((task) => {
           const agent = agents?.find((a) => a.id === task.agentId);
-          const hb = heartbeats?.find((h) => h.agentId === task.agentId);
-          return <KanbanCard key={task.id} task={task} agent={agent} heartbeat={hb} onClick={onTaskClick} />;
+          return <KanbanCard key={task.id} task={task} agent={agent} onClick={onTaskClick} />;
         })}
       </div>
     </div>
