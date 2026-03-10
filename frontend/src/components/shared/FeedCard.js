@@ -2,6 +2,92 @@ import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+const mdComponents = {
+  h1: ({ children }) => (
+    <h1 className="text-base font-bold text-white mt-0 mb-3 pb-2 border-b border-gray-700">{children}</h1>
+  ),
+  h2: ({ children }) => (
+    <h2 className="text-xs font-semibold text-accent uppercase tracking-wide mt-6 mb-2 first:mt-0">{children}</h2>
+  ),
+  h3: ({ children }) => (
+    <h3 className="text-sm font-semibold text-gray-200 mt-4 mb-1.5">{children}</h3>
+  ),
+  h4: ({ children }) => (
+    <h4 className="text-sm font-medium text-gray-300 mt-3 mb-1">{children}</h4>
+  ),
+  p: ({ children }) => (
+    <p className="text-gray-300 text-sm leading-relaxed mb-2">{children}</p>
+  ),
+  ul: ({ children }) => (
+    <ul className="mb-2 space-y-0.5 pl-4">{children}</ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="mb-2 space-y-0.5 pl-4 list-decimal">{children}</ol>
+  ),
+  li: ({ children, className }) => {
+    const isTask = className === 'task-list-item';
+    return (
+      <li className={`text-sm text-gray-300 leading-relaxed ${isTask ? 'list-none -ml-4 flex items-start gap-2' : 'list-disc'}`}>
+        {children}
+      </li>
+    );
+  },
+  input: ({ checked }) => (
+    <span className={`inline-flex items-center justify-center w-4 h-4 rounded border flex-shrink-0 mt-0.5 ${
+      checked ? 'bg-accent border-accent text-white' : 'border-gray-600 bg-gray-800'
+    }`}>
+      {checked && (
+        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M2 6l3 3 5-5" />
+        </svg>
+      )}
+    </span>
+  ),
+  blockquote: ({ children }) => (
+    <blockquote className="my-2 px-3 py-2 bg-gray-800/60 border border-gray-700 rounded-lg text-sm text-gray-400 [&_p]:mb-0 [&_strong]:text-gray-300">
+      {children}
+    </blockquote>
+  ),
+  hr: () => <hr className="border-gray-800 my-4" />,
+  table: ({ children }) => (
+    <div className="overflow-x-auto mb-3 rounded-lg border border-gray-700">
+      <table className="min-w-full text-sm">{children}</table>
+    </div>
+  ),
+  thead: ({ children }) => (
+    <thead className="bg-gray-800 border-b border-gray-700">{children}</thead>
+  ),
+  tbody: ({ children }) => (
+    <tbody className="divide-y divide-gray-800">{children}</tbody>
+  ),
+  tr: ({ children }) => (
+    <tr className="hover:bg-gray-800/40 transition-colors">{children}</tr>
+  ),
+  th: ({ children }) => (
+    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">
+      {children}
+    </th>
+  ),
+  td: ({ children }) => (
+    <td className="px-3 py-2 text-gray-300 align-top">{children}</td>
+  ),
+  code: ({ children }) => (
+    <code className="px-1.5 py-0.5 bg-gray-800 text-green-400 rounded text-xs font-mono">{children}</code>
+  ),
+  pre: ({ children }) => (
+    <pre className="bg-gray-900 border border-gray-700 rounded-lg p-3 my-2 overflow-x-auto text-xs font-mono text-green-400 leading-relaxed">
+      {children}
+    </pre>
+  ),
+  a: ({ href, children }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline underline-offset-2">
+      {children}
+    </a>
+  ),
+  strong: ({ children }) => <strong className="font-semibold text-gray-100">{children}</strong>,
+  em: ({ children }) => <em className="italic text-gray-400">{children}</em>,
+};
+
 const AGENT_COLORS = {
   'work-agent': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
   'personal-agent': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
@@ -62,20 +148,18 @@ export default function FeedCard({ run, compact = false }) {
       </div>
 
       {expanded && run.summary && (
-        <div className="px-4 pb-4 border-t border-gray-800">
-          <div className="mt-3 prose prose-invert prose-sm max-w-none text-gray-300
-            prose-headings:text-white prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2
-            prose-p:my-1 prose-ul:my-1 prose-li:my-0
-            prose-code:text-accent prose-code:bg-gray-800 prose-code:px-1 prose-code:rounded
-            prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline
-            prose-table:text-sm prose-th:text-left prose-th:text-gray-400 prose-td:text-gray-300
-            prose-hr:border-gray-700">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{run.summary}</ReactMarkdown>
+        <div className="px-5 pb-5 border-t border-gray-800">
+          <div className="mt-4">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+              {run.summary}
+            </ReactMarkdown>
           </div>
-          <div className="mt-3 flex items-center gap-4 text-[11px] text-gray-600">
+          <div className="mt-4 pt-3 border-t border-gray-800/60 flex items-center gap-4 text-[11px] text-gray-600">
             {run.durationMs && <span>{Math.round(run.durationMs / 1000)}s</span>}
-            {run.model && <span>{run.model}</span>}
-            {run.usage && <span>{run.usage.total_tokens?.toLocaleString()} tokens</span>}
+            {(run.provider || run.model) && (
+              <span>{run.provider && run.model ? `${run.provider}/${run.model}` : (run.model || run.provider)}</span>
+            )}
+            {run.usage?.total_tokens && <span>{run.usage.total_tokens.toLocaleString()} tokens</span>}
             {run.ts && <span>{new Date(run.ts).toLocaleString()}</span>}
           </div>
         </div>
