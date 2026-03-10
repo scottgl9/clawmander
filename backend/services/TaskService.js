@@ -86,15 +86,29 @@ class TaskService {
     return removed;
   }
 
-  // Remove done tasks from previous days (midnight CST = UTC-6)
-  cleanupDoneTasks() {
+  // Midnight CST cleanup: if no tasks are in_progress, wipe all tasks.
+  // Otherwise only remove done tasks from previous days.
+  midnightCleanup() {
     const tasks = this.store.read();
+    const hasActive = tasks.some((t) => t.status === 'in_progress');
+
+    if (!hasActive) {
+      // No active tasks — clear everything
+      let removed = 0;
+      for (const t of tasks) {
+        this.store.remove(t.id);
+        removed++;
+      }
+      if (removed > 0) {
+        console.log(`[TaskService] Midnight cleanup: cleared all ${removed} task(s) (no active tasks)`);
+      }
+      return removed;
+    }
+
+    // Active tasks exist — only remove done tasks from previous days (CST = UTC-6)
     const nowUtc = Date.now();
-    // Midnight CST in UTC offset: CST is UTC-6, CDT is UTC-5
-    // Use a simple approach: midnight UTC-6
     const CST_OFFSET_MS = 6 * 60 * 60 * 1000;
     const todayStartUtc = Math.floor((nowUtc - CST_OFFSET_MS) / 86400000) * 86400000 + CST_OFFSET_MS;
-
     const toDelete = tasks.filter(
       (t) => t.status === 'done' && new Date(t.updatedAt).getTime() < todayStartUtc
     );
@@ -104,9 +118,30 @@ class TaskService {
       removed++;
     }
     if (removed > 0) {
-      console.log(`[TaskService] Cleaned up ${removed} stale done task(s) from previous days`);
+      console.log(`[TaskService] Midnight cleanup: removed ${removed} stale done task(s) from previous days`);
     }
     return removed;
+  }
+
+  // Remove any task (any status) older than 24 hours
+  cleanupOldTasks() {
+    const tasks = this.store.read();
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const toDelete = tasks.filter((t) => new Date(t.createdAt).getTime() < cutoff);
+    let removed = 0;
+    for (const t of toDelete) {
+      this.store.remove(t.id);
+      removed++;
+    }
+    if (removed > 0) {
+      console.log(`[TaskService] Removed ${removed} task(s) older than 24 hours`);
+    }
+    return removed;
+  }
+
+  // Alias kept for startup call
+  cleanupDoneTasks() {
+    return this.midnightCleanup();
   }
 }
 

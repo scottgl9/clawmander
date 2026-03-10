@@ -227,6 +227,8 @@ class ChatGatewayClient {
     const { event, payload } = msg;
     if (event === 'chat') {
       this._handleChatEvent(payload || {});
+    } else if (event === 'presence' || event === 'presence.update') {
+      this.sse.broadcast('agent.presence', payload || {});
     }
   }
 
@@ -309,6 +311,10 @@ class ChatGatewayClient {
 
   async listModels() {
     return this._sendRequest('models.list', {});
+  }
+
+  async listAgents() {
+    return this._sendRequest('agents.list', {});
   }
 
   async resolveApproval(approvalId, decision) {
