@@ -34,25 +34,12 @@ export default function SessionSidebar({ sessions, activeSession, onSelect, onRe
 
   const filteredSessions = useMemo(() => {
     if (filter === 'all') return sessions;
-    // 'direct' — show only user-created agent sessions
+    // 'direct' — only show clawmander: sessions with a numeric label
     return sessions.filter((s) => {
       const key = getSessionKey(s);
-      const kind = s.kind || '';
-      if (kind === 'group') return false;
-      // Filter platform-specific sessions (may start with or contain platform prefix)
-      if (key.startsWith('discord:') || key.includes(':discord:')) return false;
-      if (key.startsWith('matrix:') || key.includes(':matrix:')) return false;
-      // For agent: sessions, only show user-created ones (label is 'main' or '<name>-<number>')
-      if (key.startsWith('agent:')) {
-        const label = key.split(':')[2] || '';
-        if (label !== 'main' && !/^[\w-]+-\d+$/.test(label)) return false;
-      }
-      // For clawmander: sessions, label must be a plain number
-      if (key.startsWith('clawmander:')) {
-        const label = key.split(':')[2] || '';
-        if (!/^\d+$/.test(label)) return false;
-      }
-      return true;
+      if (!key.startsWith('clawmander:')) return false;
+      const label = key.split(':')[2] || '';
+      return /^\d+$/.test(label);
     });
   }, [sessions, filter]);
 
