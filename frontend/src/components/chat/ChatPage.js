@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useSSE } from '../../hooks/useSSE';
 import { useChatState } from '../../hooks/useChatState';
 import { chatApi } from '../../lib/chatApi';
@@ -9,7 +9,26 @@ import ApprovalBanner from './ApprovalBanner';
 import SubagentBadge from './SubagentBadge';
 import AgentPresenceBar from './AgentPresenceBar';
 
+function getSessionKey(s) {
+  return s.key || s.sessionKey || '';
+}
+
+function filterSessions(sessions, filter) {
+  if (filter === 'all') {
+    return sessions.filter((s) => !getSessionKey(s).includes(':cron:'));
+  }
+  // direct: only clawmander:<agent>:<number> sessions
+  return sessions.filter((s) => {
+    const key = getSessionKey(s);
+    if (!key.startsWith('clawmander:')) return false;
+    const label = key.split(':')[2] || '';
+    return /^\d+$/.test(label);
+  });
+}
+
 export default function ChatPage({ onConnectionChange }) {
+  const [filter, setFilter] = useState('direct');
+
   const {
     sessions,
     models,
@@ -33,7 +52,9 @@ export default function ChatPage({ onConnectionChange }) {
     handleSSEEvent,
   } = useChatState();
 
-  // Connect SSE (chat events are already in the useSSE event list)
+  const filteredSessions = useMemo(() => filterSessions(sessions, filter), [sessions, filter]);
+
+  // Connect SSE
   const sseConnected = useSSE(handleSSEEvent);
 
   // Relay connection state to parent (Layout)
@@ -60,11 +81,36 @@ export default function ChatPage({ onConnectionChange }) {
 
   const currentMessages = activeSession ? (messages[activeSession] || []) : [];
 
+  // No filtered sessions available
+  if (connected && sessions.length > 0 && filteredSessions.length === 0) {
+    return (
+      <div className="flex h-full">
+        <SessionSidebar
+          sessions={sessions}
+          filteredSessions={filteredSessions}
+          filter={filter}
+          onFilterChange={setFilter}
+          activeSession={activeSession}
+          connected={connected}
+          onSelect={switchSession}
+          onReload={loadSessions}
+          onNewSession={createSession}
+        />
+        <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">
+          No sessions match the current filter
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full">
       {/* Session sidebar */}
       <SessionSidebar
         sessions={sessions}
+        filteredSessions={filteredSessions}
+        filter={filter}
+        onFilterChange={setFilter}
         activeSession={activeSession}
         connected={connected}
         onSelect={switchSession}
@@ -74,8 +120,8 @@ export default function ChatPage({ onConnectionChange }) {
 
       {/* Main chat area */}
       <div className="flex flex-col flex-1 min-w-0">
-        {/* Presence bar */}
-        <AgentPresenceBar sessions={sessions} activeSession={activeSession} />
+        {/* Presence bar — only filtered sessions */}
+        <AgentPresenceBar sessions={filteredSessions} activeSession={activeSession} />
 
         {/* No session selected */}
         {!activeSession ? (
