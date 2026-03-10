@@ -103,19 +103,11 @@ module.exports = function (chatGatewayClient, chatService) {
     return upload;
   }
 
-  // GET /api/chat/agents
-  router.get('/agents', async (req, res) => {
-    try {
-      if (!chatGatewayClient.connected) {
-        return res.json({ agents: [], connected: false });
-      }
-      const result = await chatGatewayClient.listAgents();
-      const agents = Array.isArray(result) ? result : (result?.agents || result?.items || []);
-      res.json({ agents, connected: true });
-    } catch (err) {
-      console.error('[Chat] agents list error:', err.message);
-      res.status(500).json({ error: err.message });
-    }
+  // GET /api/chat/agents — returns known agents with live isWorking state
+  // Derived from gateway start/end/agent-lifecycle events, not agents.list RPC (which has no activity data)
+  router.get('/agents', (req, res) => {
+    const agents = chatGatewayClient.getAgentStatuses();
+    res.json({ agents, connected: chatGatewayClient.connected });
   });
 
   // GET /api/chat/sessions
