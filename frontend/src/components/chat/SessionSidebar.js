@@ -9,14 +9,14 @@ function getSessionKey(s) {
   return s.key || s.sessionKey;
 }
 
-// Extract unique agent IDs from session keys (agent:<agentId>:...)
+// Extract unique agent IDs from session keys (agent:<agentId>:... or clawmander:<agentId>:...)
 function extractAgents(sessions) {
   const seen = new Set();
   for (const s of sessions) {
     const key = getSessionKey(s);
     if (!key) continue;
     const parts = key.split(':');
-    if (parts[0] === 'agent' && parts[1]) seen.add(parts[1]);
+    if ((parts[0] === 'agent' || parts[0] === 'clawmander') && parts[1]) seen.add(parts[1]);
   }
   return [...seen].sort();
 }
@@ -34,13 +34,24 @@ export default function SessionSidebar({ sessions, activeSession, onSelect, onRe
 
   const filteredSessions = useMemo(() => {
     if (filter === 'all') return sessions;
-    // 'direct' — hide matrix: and discord: channel sessions
+    // 'direct' — show only user-created agent sessions
     return sessions.filter((s) => {
       const key = getSessionKey(s);
       const kind = s.kind || '';
       if (kind === 'group') return false;
-      // Also filter by key pattern for sessions without kind
-      if (key.includes(':matrix:') || key.includes(':discord:')) return false;
+      // Filter platform-specific sessions (may start with or contain platform prefix)
+      if (key.startsWith('discord:') || key.includes(':discord:')) return false;
+      if (key.startsWith('matrix:') || key.includes(':matrix:')) return false;
+      // For agent: sessions, only show user-created ones (label is 'main' or '<name>-<number>')
+      if (key.startsWith('agent:')) {
+        const label = key.split(':')[2] || '';
+        if (label !== 'main' && !/^[\w-]+-\d+$/.test(label)) return false;
+      }
+      // For clawmander: sessions, label must be a plain number
+      if (key.startsWith('clawmander:')) {
+        const label = key.split(':')[2] || '';
+        if (!/^\d+$/.test(label)) return false;
+      }
       return true;
     });
   }, [sessions, filter]);

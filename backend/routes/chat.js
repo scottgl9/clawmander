@@ -1,6 +1,9 @@
 const express = require('express');
 const path = require('path');
+const os = require('os');
 const { v4: uuidv4 } = require('uuid');
+
+const SYSTEM_USERNAME = os.userInfo().username;
 
 // Normalize OpenClaw gateway chat.history response into Clawmander message format
 function normalizeGatewayHistory(result, sessionKey) {
@@ -111,8 +114,13 @@ module.exports = function (chatGatewayClient, chatService) {
       const sessions = Array.isArray(result) ? result : (result?.sessions || result?.items || []);
       const filtered = sessions.filter((s) => {
         const key = s.key || s.sessionKey || '';
-        // Exclude cron and group channels
-        return !key.includes(':cron:') && !key.includes(':group:');
+        const kind = s.kind || '';
+        if (kind === 'group') return false;
+        if (key.includes(':cron:')) return false;
+        if (key.startsWith('discord:') || key.includes(':discord:')) return false;
+        if (key.startsWith('matrix:') || key.includes(':matrix:')) return false;
+        if (SYSTEM_USERNAME && key.includes(SYSTEM_USERNAME)) return false;
+        return true;
       });
       res.json({ sessions: filtered, connected: true });
     } catch (err) {
