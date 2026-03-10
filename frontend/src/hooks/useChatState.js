@@ -319,18 +319,27 @@ export function useChatState() {
     }
   }, [activeSession, injectSystemMessage, loadSessions, setError]);
 
-  // Create a new direct session for an agent
+  // Create a new direct session for an agent, numbered sequentially (e.g. clawmander:work-agent:1)
   const createSession = useCallback(async (agentId) => {
-    const sessionKey = `agent:${agentId}:main`;
-    // Reset the session to ensure it's fresh
+    const prefix = `clawmander:${agentId}:`;
+    const nums = sessions
+      .map((s) => s.key || s.sessionKey || '')
+      .filter((k) => k.startsWith(prefix))
+      .map((k) => {
+        const n = parseInt(k.slice(prefix.length), 10);
+        return isNaN(n) ? 0 : n;
+      })
+      .filter((n) => n > 0);
+    const nextNum = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+    const sessionKey = `${prefix}${nextNum}`;
     try {
       await chatApi.resetSession(sessionKey, 'new');
     } catch {
-      // Session might not exist yet, which is fine — sending a message will create it
+      // Session might not exist yet — sending a message will create it
     }
     await loadSessions();
     switchSession(sessionKey);
-  }, [loadSessions, switchSession]);
+  }, [sessions, loadSessions, switchSession]);
 
   // Initial load
   useEffect(() => {
