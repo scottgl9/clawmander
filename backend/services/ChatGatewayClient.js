@@ -443,7 +443,9 @@ class ChatGatewayClient {
 
   _extractText(message) {
     if (!message) return '';
-    if (typeof message === 'string') return message;
+    // Plain strings are tool outputs / raw content, not assistant streaming text — skip them.
+    // Legitimate streaming deltas always arrive as { content: [...] } objects.
+    if (typeof message === 'string') return '';
     if (Array.isArray(message.content)) {
       return message.content
         .filter((b) => b.type === 'text')
