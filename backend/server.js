@@ -129,16 +129,18 @@ if (config.testMode) {
   console.log('[Production Mode] Starting with empty data store');
 }
 
-// Cleanup stale done tasks on startup
+// Cleanup stale tasks on startup
 taskService.cleanupDoneTasks();
+taskService.cleanupOldTasks();
 
-// Schedule daily midnight CST cleanup (check every hour, run once per day)
+// Hourly: remove tasks older than 24h; also do midnight cleanup once per day
 let lastCleanupDate = new Date().toDateString();
 setInterval(() => {
+  taskService.cleanupOldTasks();
   const today = new Date().toDateString();
   if (today !== lastCleanupDate) {
     lastCleanupDate = today;
-    taskService.cleanupDoneTasks();
+    taskService.midnightCleanup();
   }
 }, 60 * 60 * 1000);
 
