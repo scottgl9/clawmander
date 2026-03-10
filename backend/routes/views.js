@@ -86,32 +86,6 @@ module.exports = function (taskService, agentService, actionItemService) {
     });
   });
 
-  router.get('/monthly', (req, res) => {
-    const agents = agentService.getAll();
-    const now = new Date();
-    const monthKey = now.toISOString().slice(0, 7);
-    
-    // Get all action items (monthly strategic view)
-    const allActionItems = actionItemService.getAll();
-    
-    const personal = getTopPriorityItems(allActionItems.filter(i => i.category === 'personal'), 20);
-    const work = getTopPriorityItems(allActionItems.filter(i => i.category === 'work'), 20);
-    
-    res.json({
-      month: now.toLocaleString('default', { month: 'long', year: 'numeric' }),
-      monthKey,
-      items: [...personal, ...work],
-      personal,
-      work,
-      agents,
-      stats: {
-        total: allActionItems.length,
-        personal: allActionItems.filter(i => i.category === 'personal').length,
-        work: allActionItems.filter(i => i.category === 'work').length,
-      }
-    });
-  });
-
   return router;
 };
 

@@ -140,3 +140,6 @@ vite.config.ts.timestamp-*
 
 # Clawmander data files
 backend/storage/data/*.json
+backend/storage/data/*.db
+backend/storage/data/*.db-wal
+backend/storage/data/*.db-shm
