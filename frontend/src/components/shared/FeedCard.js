@@ -99,6 +99,24 @@ const AGENT_COLORS = {
   'jira-agent': 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
 };
 
+function stripMarkdown(text) {
+  return text
+    .replace(/^#{1,6}\s+/gm, '')        // headings
+    .replace(/\*\*([^*]+)\*\*/g, '$1')  // bold
+    .replace(/\*([^*]+)\*/g, '$1')      // italic
+    .replace(/__([^_]+)__/g, '$1')      // bold underscore
+    .replace(/_([^_]+)_/g, '$1')        // italic underscore
+    .replace(/`([^`]+)`/g, '$1')        // inline code
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links
+    .replace(/^[-*]\s+\[[ x]\]\s*/gm, '')    // task list markers
+    .replace(/^[-*+]\s+/gm, '')         // list bullets
+    .replace(/^>\s+/gm, '')             // blockquotes
+    .replace(/^---+$/gm, '')            // horizontal rules
+    .replace(/[*_~`]/g, '')             // remaining markers
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function timeAgo(isoString) {
   if (!isoString) return '';
   const diff = Date.now() - new Date(isoString).getTime();
@@ -116,7 +134,7 @@ export default function FeedCard({ run, compact = false }) {
   const agentColor = AGENT_COLORS[run.agentId] || 'bg-gray-500/20 text-gray-400 border-gray-500/30';
 
   const preview = run.summary
-    ? run.summary.split('\n').filter(l => l.trim()).slice(0, 2).join(' ').slice(0, 120)
+    ? stripMarkdown(run.summary.split('\n').filter(l => l.trim()).slice(0, 3).join(' ')).slice(0, 120)
     : null;
 
   return (

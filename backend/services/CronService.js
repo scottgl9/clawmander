@@ -3,9 +3,10 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 class CronService {
-  constructor(sseManager, openClawHome) {
+  constructor(sseManager, openClawHome, taskService = null) {
     this.sseManager = sseManager;
     this.openClawHome = openClawHome;
+    this.taskService = taskService;
     this.cronDir = path.join(openClawHome, 'cron');
     this.jobsFile = path.join(this.cronDir, 'jobs.json');
     this.runsDir = path.join(this.cronDir, 'runs');
@@ -180,11 +181,14 @@ class CronService {
               try {
                 const run = JSON.parse(line);
                 const jobId = file.replace('.jsonl', '');
+                const agentId = jobAgentMap[jobId] || jobId;
                 this.sseManager.broadcast('feed.new', {
                   ...this._formatRun(run),
-                  agentId: jobAgentMap[jobId] || jobId,
+                  agentId,
                   jobName: jobNameMap[jobId] || null,
                 });
+                // Reconcile any stuck in_progress task for this run
+                this._reconcileTask(run, agentId);
               } catch {}
             }
             this._lastLineCounts[file] = currentCount;
@@ -194,6 +198,67 @@ class CronService {
 
       // Also broadcast cron status update
       this.sseManager.broadcast('cron.status', { jobs: this.getJobs() });
+    } catch {}
+  }
+
+  // Called at startup: mark any in_progress cron tasks done/blocked if their run already finished.
+  reconcileStuckTasks() {
+    if (!this.taskService) return;
+    try {
+      const tasks = this.taskService.getAll();
+      const stuckCronTasks = tasks.filter(
+        (t) => t.status === 'in_progress' && t.sessionKey && t.sessionKey.includes(':cron:')
+      );
+      if (stuckCronTasks.length === 0) return;
+
+      for (const task of stuckCronTasks) {
+        // sessionKey format: agent:<agentId>:cron:<jobId>:run:<runId>  or  agent:<agentId>:cron:<jobId>
+        const jobIdMatch = task.sessionKey.match(/:cron:([^:]+)/);
+        if (!jobIdMatch) continue;
+        const jobId = jobIdMatch[1];
+        const runFilePath = path.join(this.runsDir, `${jobId}.jsonl`);
+        try {
+          const lines = fs.readFileSync(runFilePath, 'utf8').trim().split('\n').filter(Boolean);
+          // Find the run matching this task's runId (or just the last run)
+          let matchedRun = null;
+          for (const line of lines) {
+            try {
+              const run = JSON.parse(line);
+              if (task.runId && run.sessionId === task.runId) { matchedRun = run; break; }
+              if (!task.runId) matchedRun = run; // fallback: use last
+            } catch {}
+          }
+          if (!matchedRun) matchedRun = lines.length ? (() => { try { return JSON.parse(lines[lines.length - 1]); } catch { return null; } })() : null;
+          if (matchedRun && matchedRun.action === 'finished') {
+            const newStatus = matchedRun.status === 'ok' ? 'done' : 'blocked';
+            this.taskService.update(task.id, { status: newStatus, progress: newStatus === 'done' ? 100 : task.progress });
+            console.log(`[CronService] Reconciled stuck task ${task.id} (${task.title}) → ${newStatus}`);
+          }
+        } catch {}
+      }
+    } catch (err) {
+      console.error('[CronService] reconcileStuckTasks error:', err.message);
+    }
+  }
+
+  // Reconcile a single task after a new run is detected
+  _reconcileTask(run, agentId) {
+    if (!this.taskService || run.action !== 'finished') return;
+    try {
+      const tasks = this.taskService.getAll();
+      const match = tasks.find(
+        (t) =>
+          t.status === 'in_progress' &&
+          t.sessionKey &&
+          t.sessionKey.includes(':cron:') &&
+          (t.agentId === agentId || t.sessionKey.includes(run.jobId)) &&
+          (run.sessionId ? (t.runId === run.sessionId || !t.runId) : true)
+      );
+      if (match) {
+        const newStatus = run.status === 'ok' ? 'done' : 'blocked';
+        this.taskService.update(match.id, { status: newStatus, progress: newStatus === 'done' ? 100 : match.progress });
+        console.log(`[CronService] Reconciled task ${match.id} (${match.title}) → ${newStatus}`);
+      }
     } catch {}
   }
 

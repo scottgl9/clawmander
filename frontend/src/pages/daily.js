@@ -4,6 +4,24 @@ import { useAPI } from '../hooks/useAPI';
 import { useSSE } from '../hooks/useSSE';
 import { api } from '../lib/api';
 import { StatusBadge, PriorityBadge } from '../components/shared/Badge';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import WorkBrief from '../components/work/WorkBrief';
+
+const taskMdComponents = {
+  p: ({ children }) => <p className="text-gray-300 leading-relaxed mb-1 last:mb-0">{children}</p>,
+  strong: ({ children }) => <strong className="font-semibold text-gray-200">{children}</strong>,
+  em: ({ children }) => <em className="italic text-gray-400">{children}</em>,
+  ul: ({ children }) => <ul className="mt-1 mb-1 space-y-0.5 pl-3">{children}</ul>,
+  ol: ({ children }) => <ol className="mt-1 mb-1 space-y-0.5 pl-3 list-decimal">{children}</ol>,
+  li: ({ children }) => <li className="list-disc text-gray-300">{children}</li>,
+  code: ({ children }) => (
+    <code className="px-1 py-0.5 bg-gray-800 text-green-400 rounded font-mono text-[10px]">{children}</code>
+  ),
+  a: ({ href, children }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline underline-offset-2">{children}</a>
+  ),
+};
 
 export default function DailyView() {
   const connected = useSSE(() => {});
@@ -21,6 +39,9 @@ export default function DailyView() {
 
         {data && (
           <div className="space-y-4">
+            {/* Daily Brief */}
+            <WorkBrief />
+
             {/* Stats */}
             <div className="grid grid-cols-4 gap-3">
               {Object.entries(data.stats?.byStatus || {}).map(([status, count]) => (
@@ -53,10 +74,9 @@ export default function DailyView() {
                     </div>
                     {expandedId === task.id && (
                       <div className="ml-7 mt-1 mb-2 text-xs border-l border-gray-700 pl-3 space-y-1">
-                        {task.details && <p className="text-gray-300">{task.details}</p>}
-                        {task.description && !task.details && <p className="text-gray-400">{task.description}</p>}
-                        {task.details && task.description && <p className="text-gray-500">{task.description}</p>}
-                        {!task.details && !task.description && <p className="text-gray-600 italic">No details provided</p>}
+                        {task.description
+                          ? <ReactMarkdown remarkPlugins={[remarkGfm]} components={taskMdComponents}>{task.description}</ReactMarkdown>
+                          : <p className="text-gray-600 italic">No details provided</p>}
                         {task.tags?.length > 0 && (
                           <div className="flex gap-1 pt-1">
                             {task.tags.map((tag) => (
