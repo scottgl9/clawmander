@@ -19,10 +19,46 @@ class ChatGatewayClient {
     this._challengeTimer = null;
     this._handshakeComplete = false;
     this._connected = false;
+
+    // Agent activity tracking
+    // _knownAgents: agentId -> { id, name, lastSeen }
+    // _activeRuns:  agentId -> { runId, sessionKey, startedAt }
+    this._knownAgents = new Map();
+    this._activeRuns = new Map();
   }
 
   get connected() {
     return this._connected;
+  }
+
+  // Returns array of all known agents merged with their current working state
+  getAgentStatuses() {
+    const agents = [];
+    for (const [agentId, info] of this._knownAgents) {
+      const run = this._activeRuns.get(agentId);
+      agents.push({
+        id: agentId,
+        name: info.name || agentId,
+        lastSeen: info.lastSeen,
+        isWorking: !!run,
+        runId: run?.runId || null,
+        sessionKey: run?.sessionKey || null,
+      });
+    }
+    // Also include any agents working that aren't in knownAgents yet
+    for (const [agentId, run] of this._activeRuns) {
+      if (!this._knownAgents.has(agentId)) {
+        agents.push({
+          id: agentId,
+          name: agentId,
+          lastSeen: new Date().toISOString(),
+          isWorking: true,
+          runId: run.runId,
+          sessionKey: run.sessionKey,
+        });
+      }
+    }
+    return agents;
   }
 
   start() {
@@ -225,10 +261,70 @@ class ChatGatewayClient {
 
   _handleEvent(msg) {
     const { event, payload } = msg;
-    if (event === 'chat') {
-      this._handleChatEvent(payload || {});
-    } else if (event === 'presence' || event === 'presence.update') {
-      this.sse.broadcast('agent.presence', payload || {});
+    switch (event) {
+      case 'chat':
+        this._handleChatEvent(payload || {});
+        break;
+      // Agent lifecycle events — two formats the gateway may use:
+      // 1. top-level 'start'/'end'/'error' events (have agentId field)
+      // 2. 'agent' event with stream='lifecycle' + data.phase (extract agentId from sessionKey)
+      case 'start':
+        this._handleRunLifecycle(payload || {}, 'start');
+        break;
+      case 'end':
+        this._handleRunLifecycle(payload || {}, 'end');
+        break;
+      case 'agent':
+        if ((payload || {}).stream === 'lifecycle') {
+          const phase = payload.data?.phase;
+          if (phase === 'start' || phase === 'end' || phase === 'error') {
+            this._handleRunLifecycle({ ...payload, agentId: this._extractAgentId(payload.sessionKey) }, phase);
+          }
+        }
+        break;
+      // heartbeat: agent is alive, register it as known
+      case 'heartbeat': {
+        const agentId = (payload || {}).agentId || (payload || {}).id;
+        if (agentId) this._touchAgent(agentId, (payload || {}).name);
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  // Extract agentId from a session key like agent:<agentId>:<label> or clawmander:<agentId>:<label>
+  _extractAgentId(sessionKey) {
+    if (!sessionKey) return null;
+    const parts = sessionKey.split(':');
+    return parts.length >= 2 ? parts[1] : null;
+  }
+
+  _touchAgent(agentId, name) {
+    this._knownAgents.set(agentId, {
+      name: name || this._knownAgents.get(agentId)?.name || agentId,
+      lastSeen: new Date().toISOString(),
+    });
+  }
+
+  _handleRunLifecycle(data, phase) {
+    const agentId = data.agentId || data.id || this._extractAgentId(data.sessionKey);
+    if (!agentId) return;
+
+    const runId = data.runId;
+    const sessionKey = data.sessionKey;
+
+    this._touchAgent(agentId, data.name);
+
+    if (phase === 'start') {
+      this._activeRuns.set(agentId, { runId, sessionKey, startedAt: Date.now() });
+      console.log(`[Chat] Agent ${agentId} started run ${runId}`);
+      this.sse.broadcast('agent.status', { agentId, isWorking: true, runId, sessionKey });
+    } else {
+      // end or error
+      this._activeRuns.delete(agentId);
+      console.log(`[Chat] Agent ${agentId} finished run ${runId}`);
+      this.sse.broadcast('agent.status', { agentId, isWorking: false, runId, sessionKey });
     }
   }
 
@@ -237,7 +333,6 @@ class ChatGatewayClient {
 
     switch (state) {
       case 'delta': {
-        // Extract text from message content blocks
         const text = this._extractText(payload.message);
         this.sse.broadcast('chat.delta', { sessionKey, runId, text, seq });
         break;
@@ -261,7 +356,6 @@ class ChatGatewayClient {
   _extractText(message) {
     if (!message) return '';
     if (typeof message === 'string') return message;
-    // message.content is an array of content blocks
     if (Array.isArray(message.content)) {
       return message.content
         .filter((b) => b.type === 'text')
@@ -311,10 +405,6 @@ class ChatGatewayClient {
 
   async listModels() {
     return this._sendRequest('models.list', {});
-  }
-
-  async listAgents() {
-    return this._sendRequest('agents.list', {});
   }
 
   async resolveApproval(approvalId, decision) {
