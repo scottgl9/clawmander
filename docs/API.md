@@ -18,6 +18,100 @@ Read endpoints (`GET`) do not require authentication.
 
 ## Endpoints
 
+### Chat (Gateway Proxy)
+
+These endpoints proxy to the OpenClaw gateway. Authentication is not required (gateway auth is handled server-side via `OPENCLAW_TOKEN`).
+
+#### List Sessions
+```
+GET /api/chat/sessions
+```
+Returns `{ sessions: [...], connected: bool }`. Sessions are filtered to direct agent sessions (no cron/group channels).
+
+#### List Models
+```
+GET /api/chat/models
+```
+Returns `{ models: [...], connected: bool }`.
+
+#### Get Local Message History
+```
+GET /api/chat/history/:sessionKey
+```
+Returns `{ messages: [...] }` — locally persisted messages (up to 200 per session).
+
+#### Send Message
+```
+POST /api/chat/send
+Content-Type: application/json
+
+{ "sessionKey": "agent:my-agent:main", "message": "Hello!", "attachments": [] }
+```
+Returns `{ ok: true, runId, messageId }`. Streaming response arrives via SSE.
+
+#### Abort Active Run
+```
+POST /api/chat/abort
+Content-Type: application/json
+
+{ "sessionKey": "agent:my-agent:main", "runId": "<optional>" }
+```
+
+#### Reset Session
+```
+POST /api/chat/sessions/:sessionKey/reset
+Content-Type: application/json
+
+{ "reason": "new" }
+```
+
+#### Patch Session
+```
+POST /api/chat/sessions/:sessionKey/patch
+Content-Type: application/json
+
+{ "model": "anthropic/claude-opus-4", "thinkingLevel": "auto" }
+```
+
+#### Resolve Approval
+```
+POST /api/chat/approval/resolve
+Content-Type: application/json
+
+{ "approvalId": "<uuid>", "decision": "approve" }
+```
+
+#### Upload Image
+```
+POST /api/chat/upload
+Content-Type: multipart/form-data
+
+file: <image file>
+```
+Returns `{ ok: true, url: "/api/chat/uploads/<filename>", filename, originalname }`.
+
+#### Serve Uploaded Images
+```
+GET /api/chat/uploads/:filename
+```
+
+---
+
+### Chat SSE Events
+
+Delivered via `GET /api/sse/subscribe`:
+
+| Event | Payload | Description |
+|---|---|---|
+| `chat.delta` | `{ sessionKey, runId, text, seq }` | Streaming text chunk |
+| `chat.final` | `{ sessionKey, runId, text, usage }` | Response complete |
+| `chat.error` | `{ sessionKey, runId, error }` | Response error |
+| `chat.aborted` | `{ sessionKey, runId }` | Response aborted |
+| `chat.approval` | `{ approvalId, sessionKey, command, description }` | Approval request pending |
+| `chat.subagent` | `{ sessionKey, childSessionKey, state, label }` | Subagent activity |
+
+---
+
 ### Tasks
 
 #### Create Task

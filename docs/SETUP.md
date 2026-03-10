@@ -22,11 +22,11 @@ cd clawmander
 ### 2. Install Dependencies
 
 ```bash
-# Backend
+# Backend (includes multer for image uploads)
 cd backend
 npm install
 
-# Frontend
+# Frontend (includes react-markdown, remark-gfm for chat markdown)
 cd ../frontend
 npm install
 ```

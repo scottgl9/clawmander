@@ -6,7 +6,7 @@ import { KANBAN_COLUMNS } from '../../lib/constants';
 import KanbanColumn from './KanbanColumn';
 import TaskDetailModal from '../shared/TaskDetailModal';
 
-export default function KanbanBoard() {
+export default function KanbanBoard({ onConnectionChange } = {}) {
   const [tasks, setTasks] = useState([]);
   const [agents, setAgents] = useState([]);
   const [heartbeats, setHeartbeats] = useState([]);
@@ -38,10 +38,18 @@ export default function KanbanBoard() {
         setTasks((prev) => [...prev, event.data]);
         break;
       case 'task.updated':
-      case 'task.status_changed':
+        // event.data IS the full task object
         setTasks((prev) =>
-          prev.map((t) => (t.id === (event.data.taskId || event.data.id) ? { ...t, ...event.data.task || event.data } : t))
+          prev.map((t) => (t.id === event.data.id ? { ...t, ...event.data } : t))
         );
+        break;
+      case 'task.status_changed':
+        // event.data = { taskId, from, to, task } — use nested .task
+        if (event.data.task) {
+          setTasks((prev) =>
+            prev.map((t) => (t.id === event.data.task.id ? { ...t, ...event.data.task } : t))
+          );
+        }
         break;
       case 'task.deleted':
         setTasks((prev) => prev.filter((t) => t.id !== event.data.taskId));
@@ -58,6 +66,11 @@ export default function KanbanBoard() {
         break;
     }
   });
+
+  // Relay connection state to parent
+  useEffect(() => {
+    if (onConnectionChange) onConnectionChange(connected);
+  }, [connected, onConnectionChange]);
 
   if (loading) {
     return (

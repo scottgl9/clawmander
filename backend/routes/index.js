@@ -7,9 +7,10 @@ const viewsRoutes = require('./views');
 const activityRoutes = require('./activity');
 const sseRoutes = require('./sse');
 const serverRoutes = require('./server');
+const chatRoutes = require('./chat');
 
 module.exports = function mountRoutes(app, services) {
-  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService } = services;
+  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService } = services;
 
   app.use('/api/agents', agentsRoutes(agentService, heartbeatService));
 
@@ -30,4 +31,5 @@ module.exports = function mountRoutes(app, services) {
   app.use('/api/activity', activityRoutes);
   app.use('/api/sse', sseRoutes(sseManager));
   app.use('/api/server', serverRoutes(serverStatusService));
+  app.use('/api/chat', chatRoutes(chatGatewayClient, chatService));
 };

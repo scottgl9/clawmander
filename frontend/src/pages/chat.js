@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import Layout from '../components/layout/Layout';
-import KanbanBoard from '../components/kanban/KanbanBoard';
+import ChatPage from '../components/chat/ChatPage';
 
-export default function AgentsPage() {
+export default function ChatPageRoute() {
   const [connected, setConnected] = useState(false);
 
   return (
     <Layout connected={connected}>
-      <KanbanBoard onConnectionChange={setConnected} />
+      <div className="h-full -m-3 md:-m-6">
+        <ChatPage onConnectionChange={setConnected} />
+      </div>
     </Layout>
   );
 }

@@ -12,6 +12,15 @@ A real-time dashboard that aggregates data from OpenClaw, workspace files, finan
 
 ## Features
 
+### 💬 Chat Interface (NEW)
+- Discord/Matrix-style chat with OpenClaw agents
+- Session sidebar with all active agent sessions
+- Streaming responses with real-time markdown rendering (GFM tables, code blocks)
+- Slash commands: `/model`, `/reset`, `/abort`, `/approve`, `/deny`, `/think`, `/verbose`
+- Image attachment support (upload and send)
+- Subagent activity indicators
+- Approval request banners with approve/deny buttons
+
 ### 🤖 Agent Status (Kanban)
 - Real-time view of what agents are working on
 - Next heartbeat countdown timer
@@ -57,16 +66,35 @@ A real-time dashboard that aggregates data from OpenClaw, workspace files, finan
 
 ```
 clawmander/
-├── backend/           # Node.js/Express REST API
-│   ├── server.js      # Main server
-│   ├── routes/        # API endpoints
-│   ├── collectors/    # Data collection modules
-│   └── models/        # Data models
-├── frontend/          # React/Next.js dashboard
-│   ├── components/    # UI components
-│   ├── pages/         # Views (daily, weekly, monthly)
-│   └── api/           # API client
-└── docs/              # Documentation
+├── backend/                    # Node.js/Express REST API
+│   ├── server.js               # Main server
+│   ├── routes/                 # API endpoints (incl. /api/chat/*)
+│   ├── collectors/             # OpenClawCollector (read-only WS)
+│   ├── services/               # ChatGatewayClient, ChatService, etc.
+│   └── models/                 # Data models
+├── frontend/                   # React/Next.js dashboard
+│   ├── components/
+│   │   ├── chat/               # Chat UI components
+│   │   ├── kanban/             # Kanban board
+│   │   └── layout/             # Sidebar, Header, Layout
+│   ├── hooks/                  # useSSE, useChatState
+│   ├── pages/                  # chat.js, agents.js, etc.
+│   └── lib/                    # api.js, chatApi.js
+└── docs/                       # Documentation (GATEWAY.md, API.md, ...)
+```
+
+### Chat Data Flow
+
+```
+Browser (React)               Express Backend              OpenClaw Gateway
+    |                               |                              |
+    |-- POST /api/chat/send ------->|                              |
+    |                               |-- WS chat.send RPC -------->|
+    |                               |                              |
+    |                               |<-- WS chat event (delta) ---|
+    |<-- SSE chat.delta ------------|                              |
+    |                               |<-- WS chat event (final) ---|
+    |<-- SSE chat.final ------------|                              |
 ```
 
 ## Data Sources
@@ -118,6 +146,7 @@ cd frontend && npm run dev     # Terminal 2 - Frontend on :3000
 
 ## Key Features
 
+- ✅ **Chat Interface** - Discord-style chat with agent sessions, markdown, slash commands
 - ✅ **Real-time Kanban Board** - Live task updates via SSE
 - ✅ **Heartbeat Monitoring** - Countdown timers with color-coded alerts
 - ✅ **Agent Status Tracking** - Visual indicators for agent health
@@ -125,7 +154,7 @@ cd frontend && npm run dev     # Terminal 2 - Frontend on :3000
 - ✅ **Time Views** - Daily, Weekly, Monthly perspectives
 - ✅ **Activity Audit Log** - Security trail of all API calls
 - ✅ **Budget & Jobs Widgets** - Integrated work/life dashboard
-- ✅ **OpenClaw Integration** - WebSocket collector with auto-reconnect
+- ✅ **OpenClaw Integration** - Dual WebSocket connections (read + read/write)
 
 ## Documentation
 
@@ -134,7 +163,8 @@ cd frontend && npm run dev     # Terminal 2 - Frontend on :3000
 - **[Setup Guide](docs/SETUP.md)** - Detailed installation and configuration
 - **[Architecture](docs/ARCHITECTURE.md)** - System design and tech decisions
 - **[Development](docs/DEVELOPMENT.md)** - Contributing and extending
-- **[API Reference](docs/API.md)** - Complete endpoint documentation
+- **[API Reference](docs/API.md)** - Complete endpoint documentation (incl. `/api/chat/*`)
+- **[Gateway Reference](docs/GATEWAY.md)** - OpenClaw WebSocket protocol deep dive
 - **[OpenClaw Integration](docs/OPENCLAW_INTEGRATION.md)** - How to connect agents
 - **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
 
@@ -179,14 +209,28 @@ See [Setup Guide](docs/SETUP.md) for details.
 - `GET /api/tasks` - All tasks
 - `GET /api/tasks/stats` - Task statistics
 - `GET /api/views/daily` - Daily view
+- `GET /api/chat/sessions` - Gateway sessions
+- `GET /api/chat/models` - Available models
+- `GET /api/chat/history/:sessionKey` - Local message history
 
-**Write Endpoints** (Bearer token required):
+**Write Endpoints** (no auth required for chat, Bearer token for tasks):
+- `POST /api/chat/send` - Send message to agent `{sessionKey, message}`
+- `POST /api/chat/abort` - Abort active run `{sessionKey}`
+- `POST /api/chat/sessions/:key/reset` - Reset session
+- `POST /api/chat/sessions/:key/patch` - Patch session settings
+- `POST /api/chat/approval/resolve` - Resolve approval `{approvalId, decision}`
+- `POST /api/chat/upload` - Upload image attachment (multipart)
 - `POST /api/agents/tasks` - Create task
 - `PATCH /api/tasks/:id` - Update task
 - `POST /api/agents/heartbeat` - Report heartbeat
 
-**SSE Stream**:
+**SSE Stream** (includes chat events):
 - `GET /api/sse/subscribe` - Real-time event stream
+  - `chat.delta` - Streaming response chunk
+  - `chat.final` - Response complete
+  - `chat.error` - Response error
+  - `chat.aborted` - Response aborted
+  - `chat.approval` - Approval request pending
 
 Full API documentation: [docs/API.md](docs/API.md)
 

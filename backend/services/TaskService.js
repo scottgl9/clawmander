@@ -85,6 +85,29 @@ class TaskService {
     if (removed) this.sse.broadcast('task.deleted', { taskId: id });
     return removed;
   }
+
+  // Remove done tasks from previous days (midnight CST = UTC-6)
+  cleanupDoneTasks() {
+    const tasks = this.store.read();
+    const nowUtc = Date.now();
+    // Midnight CST in UTC offset: CST is UTC-6, CDT is UTC-5
+    // Use a simple approach: midnight UTC-6
+    const CST_OFFSET_MS = 6 * 60 * 60 * 1000;
+    const todayStartUtc = Math.floor((nowUtc - CST_OFFSET_MS) / 86400000) * 86400000 + CST_OFFSET_MS;
+
+    const toDelete = tasks.filter(
+      (t) => t.status === 'done' && new Date(t.updatedAt).getTime() < todayStartUtc
+    );
+    let removed = 0;
+    for (const t of toDelete) {
+      this.store.remove(t.id);
+      removed++;
+    }
+    if (removed > 0) {
+      console.log(`[TaskService] Cleaned up ${removed} stale done task(s) from previous days`);
+    }
+    return removed;
+  }
 }
 
 module.exports = TaskService;

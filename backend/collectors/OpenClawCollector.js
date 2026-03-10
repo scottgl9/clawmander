@@ -313,14 +313,26 @@ class OpenClawCollector {
     const parsed = parseSessionKey(data.sessionKey);
     const agentType = parsed.isSubagent ? 'subagent' : 'main';
 
+    // Build a meaningful title from session key instead of raw runId
+    let title = data.title;
+    if (!title) {
+      if (parsed.isSubagent && parsed.subagentId) {
+        title = `Subagent: ${parsed.subagentId}`;
+      } else if (parsed.agentId) {
+        title = `Agent: ${parsed.agentId}`;
+      } else {
+        title = agentId;
+      }
+    }
+
     this.taskService.upsert({
-      title: data.title || `Run ${data.runId || 'unknown'}`,
+      title,
       agentId,
       sessionKey: data.sessionKey || null,
       runId: data.runId || null,
       status: 'in_progress',
       agentType,
-      metadata: data.metadata || {},
+      metadata: { ...(data.metadata || {}), runId: data.runId },
     });
 
     this.agentService.upsert({
@@ -342,6 +354,9 @@ class OpenClawCollector {
     if (match) {
       this.taskService.update(match.id, { status: 'done', progress: 100 });
     }
+
+    // Clean up done tasks from previous days opportunistically
+    this.taskService.cleanupDoneTasks();
 
     const remaining = this.taskService.getAll({ agentId, status: 'in_progress' });
     if (remaining.length === 0) {
