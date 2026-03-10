@@ -209,6 +209,7 @@ class CronService {
       durationMs: run.durationMs || null,
       model: run.model || null,
       provider: run.provider || null,
+      alias: run.alias || null,
       usage: run.usage || null,
       delivered: run.delivered || false,
       deliveryStatus: run.deliveryStatus || null,
