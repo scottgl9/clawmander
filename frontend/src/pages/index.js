@@ -6,7 +6,6 @@ import TrendChart from '../components/budget/TrendChart';
 import UpcomingBills from '../components/budget/UpcomingBills';
 import JobsList from '../components/jobs/JobsList';
 import ActivityLog from '../components/activity/ActivityLog';
-import AgentStatusBar from '../components/agents/AgentStatusBar';
 import { useSSE } from '../hooks/useSSE';
 
 export default function Dashboard() {
@@ -15,8 +14,6 @@ export default function Dashboard() {
   return (
     <Layout connected={connected}>
       <div className="space-y-6">
-        {/* Agent status bar */}
-        <AgentStatusBar />
 
         {/* Widget grid */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">

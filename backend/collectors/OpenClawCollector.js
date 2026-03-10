@@ -295,12 +295,22 @@ class OpenClawCollector {
   }
 
   _handleHeartbeat(data) {
-    if (data.agentId || data.id) {
+    const agentId = data.agentId || data.id;
+    if (agentId) {
       this.agentService.upsert({
-        id: data.agentId || data.id,
-        name: data.name || data.agentId || data.id,
+        id: agentId,
+        name: data.name || agentId,
         status: 'active',
         lastHeartbeat: new Date().toISOString(),
+      });
+      // Only register the agent as known; don't override isWorking if a run is active
+      const inProgress = this.taskService
+        ? this.taskService.getAll({ agentId, status: 'in_progress' }).length > 0
+        : false;
+      this.sse.broadcast('agent.status', {
+        agentId,
+        name: data.name || agentId,
+        isWorking: inProgress,
       });
     }
   }
@@ -340,6 +350,14 @@ class OpenClawCollector {
       name: data.name || agentId,
       status: 'active',
     });
+
+    this.sse.broadcast('agent.status', {
+      agentId,
+      name: data.name || agentId,
+      isWorking: true,
+      runId: data.runId || null,
+      sessionKey: data.sessionKey || null,
+    });
   }
 
   _handleRunEnd(data) {
@@ -359,13 +377,20 @@ class OpenClawCollector {
     this.taskService.cleanupDoneTasks();
 
     const remaining = this.taskService.getAll({ agentId, status: 'in_progress' });
-    if (remaining.length === 0) {
-      this.agentService.upsert({
-        id: agentId,
-        name: data.name || agentId,
-        status: 'idle',
-      });
-    }
+    const stillWorking = remaining.length > 0;
+    this.agentService.upsert({
+      id: agentId,
+      name: data.name || agentId,
+      status: stillWorking ? 'active' : 'idle',
+    });
+
+    this.sse.broadcast('agent.status', {
+      agentId,
+      name: data.name || agentId,
+      isWorking: stillWorking,
+      runId: data.runId || null,
+      sessionKey: data.sessionKey || null,
+    });
   }
 
   _handleRunError(data) {
@@ -388,6 +413,14 @@ class OpenClawCollector {
       id: agentId,
       name: data.name || agentId,
       status: 'error',
+    });
+
+    this.sse.broadcast('agent.status', {
+      agentId,
+      name: data.name || agentId,
+      isWorking: false,
+      runId: data.runId || null,
+      sessionKey: data.sessionKey || null,
     });
   }
 
