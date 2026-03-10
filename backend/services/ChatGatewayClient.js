@@ -244,6 +244,20 @@ class ChatGatewayClient {
     this._handshakeComplete = true;
     this._connected = true;
     console.log('[Chat] Connected, handshake accepted');
+    // Pre-populate known agents so the status bar shows idle agents immediately
+    this._sendRequest('agents.list', {}).then((result) => {
+      const list = Array.isArray(result) ? result : (result?.agents || result?.items || []);
+      for (const a of list) {
+        const id = a.id || a.agentId;
+        if (id && !this._knownAgents.has(id)) {
+          this._knownAgents.set(id, { name: a.name || id, lastSeen: new Date().toISOString() });
+        }
+      }
+      if (list.length > 0) {
+        console.log(`[Chat] Pre-populated ${list.length} known agent(s)`);
+        this.sse.broadcast('agent.status.snapshot', { agents: this.getAgentStatuses() });
+      }
+    }).catch(() => {});
   }
 
   _handleResponse(msg) {
