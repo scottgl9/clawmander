@@ -5,7 +5,6 @@ import BudgetSummary from '../components/budget/BudgetSummary';
 import TrendChart from '../components/budget/TrendChart';
 import UpcomingBills from '../components/budget/UpcomingBills';
 import JobsList from '../components/jobs/JobsList';
-import ActivityLog from '../components/activity/ActivityLog';
 import RecentFeeds from '../components/shared/RecentFeeds';
 import CronMonitor from '../components/shared/CronMonitor';
 import { useSSE } from '../hooks/useSSE';
@@ -46,9 +45,6 @@ export default function Dashboard() {
             <JobsList />
           </div>
         </div>
-
-        {/* Activity Log - collapsible */}
-        <ActivityLog limit={30} />
       </div>
     </Layout>
   );
