@@ -10,6 +10,8 @@ const BudgetService = require('./services/BudgetService');
 const ActionItemService = require('./services/ActionItemService');
 const ServerStatusService = require('./services/ServerStatusService');
 const OpenClawCollector = require('./collectors/OpenClawCollector');
+const ChatGatewayClient = require('./services/ChatGatewayClient');
+const ChatService = require('./services/ChatService');
 const mountRoutes = require('./routes');
 const { activityLogger } = require('./middleware/logger');
 
@@ -21,6 +23,10 @@ app.use(express.json());
 app.use(morgan('dev'));
 app.use(activityLogger);
 
+// Serve uploaded images
+const path = require('path');
+app.use('/api/chat/uploads', express.static(path.join(__dirname, 'storage/data/uploads')));
+
 // Services
 const sseManager = new SSEManager();
 const agentService = new AgentService(sseManager);
@@ -29,9 +35,22 @@ const heartbeatService = new HeartbeatService(sseManager, agentService);
 const budgetService = new BudgetService(sseManager);
 const actionItemService = new ActionItemService(sseManager);
 const serverStatusService = new ServerStatusService(sseManager);
+const chatGatewayClient = new ChatGatewayClient(sseManager);
+const chatService = new ChatService(chatGatewayClient);
+
+// Wire chat events into ChatService for message history tracking
+sseManager._origBroadcast = sseManager.broadcast.bind(sseManager);
+const _origBroadcast = sseManager.broadcast.bind(sseManager);
+sseManager.broadcast = function (event, data) {
+  _origBroadcast(event, data);
+  if (event === 'chat.delta') chatService.onDelta(data.sessionKey, data.runId, data.text || '');
+  else if (event === 'chat.final') chatService.onFinal(data.sessionKey, data.runId, data.text || '');
+  else if (event === 'chat.error') chatService.onError(data.sessionKey, data.runId, data.error);
+  else if (event === 'chat.aborted') chatService.onAborted(data.sessionKey, data.runId);
+};
 
 // Routes
-mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService });
+mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService });
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -110,9 +129,25 @@ if (config.testMode) {
   console.log('[Production Mode] Starting with empty data store');
 }
 
+// Cleanup stale done tasks on startup
+taskService.cleanupDoneTasks();
+
+// Schedule daily midnight CST cleanup (check every hour, run once per day)
+let lastCleanupDate = new Date().toDateString();
+setInterval(() => {
+  const today = new Date().toDateString();
+  if (today !== lastCleanupDate) {
+    lastCleanupDate = today;
+    taskService.cleanupDoneTasks();
+  }
+}, 60 * 60 * 1000);
+
 // Start OpenClaw collector
 const collector = new OpenClawCollector(agentService, sseManager, serverStatusService, taskService);
 collector.start();
+
+// Start Chat gateway client (separate WS connection with write scopes)
+chatGatewayClient.start();
 
 // Start server
 app.listen(config.port, '0.0.0.0', () => {

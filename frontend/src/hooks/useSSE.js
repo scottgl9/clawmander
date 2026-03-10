@@ -24,6 +24,8 @@ export function useSSE(onEvent) {
       'task.created', 'task.updated', 'task.deleted', 'task.status_changed',
       'agent.status_changed', 'heartbeat.received', 'system.health',
       'server.status',
+      'chat.delta', 'chat.final', 'chat.error', 'chat.aborted',
+      'chat.approval', 'chat.subagent',
     ];
     events.forEach((evt) => {
       es.addEventListener(evt, (e) => {

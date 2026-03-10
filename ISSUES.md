@@ -1,5 +1,24 @@
 # Known Issues
 
+## Agent Tasks View Bugs
+
+**Status**: Resolved (2026-03-10)
+**Severity**: Medium
+
+### Issues Fixed
+
+1. **Duplicate SSE connections** (`pages/agents.js` + `KanbanBoard.js`): `pages/agents.js` was creating its own `useSSE` hook with an empty callback AND `KanbanBoard.js` created its own. Fixed: removed `useSSE` from `pages/agents.js`; `KanbanBoard` now exposes `onConnectionChange` callback and owns the SSE connection.
+
+2. **Double-update on status change**: `task.updated` + `task.status_changed` both fired for the same task change. Fixed: `task.updated` now uses `event.data` directly (full task); `task.status_changed` uses `event.data.task` (nested). These handlers are now distinct and don't overlap.
+
+3. **Poor task titles from gateway**: `_handleRunStart` used `data.title || 'Run ${data.runId}'` resulting in "Run <uuid>" titles. Fixed: derives title from `parseSessionKey()` → e.g., "Agent: general-agent" or "Subagent: researcher".
+
+4. **Done task accumulation**: Done tasks never got cleaned up. Fixed: `TaskService.cleanupDoneTasks()` removes done tasks older than today (midnight CST); called on server startup + hourly + on each run end.
+
+---
+
+
+
 ## OpenClaw WebSocket Connection Failure
 
 **Status**: Resolved

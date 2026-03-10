@@ -1,5 +1,8 @@
 # Clawmander Skills Guide
 
+> **New in v2**: Chat interface at `/chat`. See the Chat API section below for sending messages via the gateway.
+
+
 How OpenClaw agents interact with the Clawmander REST API.
 
 **Base URL**: `http://localhost:3001`
@@ -358,6 +361,59 @@ Events emitted:
 | `actionitem.created` | New action item |
 | `actionitem.updated` | Action item changed |
 | `actionitem.deleted` | Action item removed |
+
+---
+
+## Skill: Chat with Agents (Gateway)
+
+The chat interface proxies messages through the backend to the OpenClaw gateway.
+
+### Send a Message
+
+```
+POST /api/chat/send
+```
+
+```json
+{
+  "sessionKey": "agent:my-agent:main",
+  "message": "What are you working on?",
+  "attachments": []
+}
+```
+
+Returns `{ runId, messageId }`. The streaming response arrives via SSE (`chat.delta`, `chat.final`).
+
+### List Sessions
+
+```
+GET /api/chat/sessions
+```
+
+Returns `{ sessions: [...], connected: bool }`. Sessions are filtered to direct agent sessions only (no cron/group channels).
+
+### Get Message History
+
+```
+GET /api/chat/history/agent:my-agent:main
+```
+
+Returns `{ messages: [...] }` — locally persisted messages (up to 200 per session).
+
+### Slash Commands (Frontend)
+
+Available in the chat input when connected to the gateway:
+
+| Command | Effect |
+|---|---|
+| `/model anthropic/claude-opus-4` | Switch model |
+| `/reset` | New conversation |
+| `/abort` | Stop current run |
+| `/approve` | Approve pending command |
+| `/deny` | Deny pending command |
+| `/think auto` | Set thinking level |
+| `/verbose on\|off` | Toggle verbose |
+| `/elevated ask` | Set permission level |
 
 ---
 
