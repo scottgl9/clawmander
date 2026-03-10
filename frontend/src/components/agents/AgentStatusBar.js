@@ -19,8 +19,13 @@ export default function AgentStatusBar() {
     fetchAgents();
   }, [fetchAgents]);
 
-  // Live updates: agent.status SSE fired on gateway start/end/agent-lifecycle events
+  // Live updates via SSE
   const handleSSEEvent = useCallback((event) => {
+    if (event.type === 'agent.status.snapshot') {
+      // Full refresh on reconnect/startup
+      if (Array.isArray(event.data.agents)) setAgents(event.data.agents);
+      return;
+    }
     if (event.type !== 'agent.status') return;
     const { agentId, isWorking, runId, sessionKey } = event.data;
     if (!agentId) return;
@@ -31,7 +36,6 @@ export default function AgentStatusBar() {
         updated[idx] = { ...updated[idx], isWorking, runId, sessionKey };
         return updated;
       }
-      // New agent seen for the first time
       return [...prev, { id: agentId, name: agentId, isWorking, runId, sessionKey }];
     });
   }, []);
