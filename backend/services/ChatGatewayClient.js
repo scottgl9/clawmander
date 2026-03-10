@@ -5,10 +5,12 @@
 
 const WebSocket = require('ws');
 const config = require('../config/config');
+const { identity: deviceIdentity, buildAuthPayloadV3, sign: signPayload, publicKeyRawBase64Url } = require('./DeviceIdentity');
 
 class ChatGatewayClient {
-  constructor(sseManager) {
+  constructor(sseManager, taskService) {
     this.sse = sseManager;
+    this.taskService = taskService || null;
     this.ws = null;
     this.reconnectDelay = 1000;
     this.maxReconnectDelay = 30000;
@@ -137,34 +139,68 @@ class ChatGatewayClient {
     });
   }
 
-  _sendConnectFrame() {
+  _sendConnectFrame(nonce) {
     const id = this._nextId();
     this._connectReqId = id;
+
+    const scopes = ['operator.read', 'operator.write', 'operator.admin'];
+    const role = 'operator';
+    const token = config.openClaw.token || '';
+    const signedAtMs = Date.now();
+
+    const clientId = 'gateway-client';
+    const clientMode = 'backend';
+
+    const device = (() => {
+      if (!nonce) return undefined;
+      const payload = buildAuthPayloadV3({
+        deviceId: deviceIdentity.deviceId,
+        clientId,
+        clientMode,
+        role,
+        scopes,
+        signedAtMs,
+        token,
+        nonce,
+        platform: process.platform,
+        deviceFamily: 'node',
+      });
+      return {
+        id: deviceIdentity.deviceId,
+        publicKey: publicKeyRawBase64Url(deviceIdentity.publicKeyPem),
+        signature: signPayload(deviceIdentity.privateKeyPem, payload),
+        signedAt: signedAtMs,
+        nonce,
+      };
+    })();
 
     const params = {
       minProtocol: 3,
       maxProtocol: 3,
       client: {
-        id: 'cli',
+        id: clientId,
         version: '1.0.0',
         platform: process.platform,
-        mode: 'cli',
+        mode: clientMode,
+        deviceFamily: 'node',
       },
-      role: 'operator',
-      scopes: ['operator.read', 'operator.write', 'operator.admin'],
-      auth: { token: config.openClaw.token || '' },
+      role,
+      scopes,
+      auth: { token },
+      ...(device ? { device } : {}),
     };
 
     this._sendRaw({ type: 'req', id, method: 'connect', params });
   }
 
-  _handleChallenge(msg) {
+  _handleChallenge(payload) {
     console.log('[Chat] Received challenge, responding...');
     if (this._challengeTimer) {
       clearTimeout(this._challengeTimer);
       this._challengeTimer = null;
     }
-    this._sendConnectFrame(msg);
+    const nonce = (typeof payload?.nonce === 'string' && payload.nonce.trim()) ? payload.nonce.trim() : null;
+    this._sendConnectFrame(nonce);
   }
 
   _scheduleReconnect() {
@@ -369,6 +405,7 @@ class ChatGatewayClient {
           this._activeRuns.delete(agentId);
           this.sse.broadcast('agent.status', { agentId, isWorking: false, runId, sessionKey });
         }
+        this._completeTask(sessionKey, runId, 'done');
         break;
       }
       case 'error':
@@ -377,6 +414,7 @@ class ChatGatewayClient {
           this._activeRuns.delete(agentId);
           this.sse.broadcast('agent.status', { agentId, isWorking: false, runId, sessionKey });
         }
+        this._completeTask(sessionKey, runId, 'blocked');
         break;
       case 'aborted':
         this.sse.broadcast('chat.aborted', { sessionKey, runId });
@@ -384,9 +422,22 @@ class ChatGatewayClient {
           this._activeRuns.delete(agentId);
           this.sse.broadcast('agent.status', { agentId, isWorking: false, runId, sessionKey });
         }
+        this._completeTask(sessionKey, runId, 'done');
         break;
       default:
         break;
+    }
+  }
+
+  _completeTask(sessionKey, runId, status) {
+    if (!this.taskService || !sessionKey) return;
+    const tasks = this.taskService.getAll();
+    const match = tasks.find(
+      (t) => t.sessionKey === sessionKey && (runId ? t.runId === runId : true) && t.status === 'in_progress'
+    );
+    if (match) {
+      const updates = { status, progress: status === 'done' ? 100 : match.progress };
+      this.taskService.update(match.id, updates);
     }
   }
 

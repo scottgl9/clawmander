@@ -35,7 +35,7 @@ const heartbeatService = new HeartbeatService(sseManager, agentService);
 const budgetService = new BudgetService(sseManager);
 const actionItemService = new ActionItemService(sseManager);
 const serverStatusService = new ServerStatusService(sseManager);
-const chatGatewayClient = new ChatGatewayClient(sseManager);
+const chatGatewayClient = new ChatGatewayClient(sseManager, taskService);
 const chatService = new ChatService(chatGatewayClient);
 
 // Wire chat events into ChatService for message history tracking
