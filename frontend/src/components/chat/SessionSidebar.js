@@ -26,25 +26,21 @@ const FILTER_OPTIONS = [
   { key: 'all', label: 'All' },
 ];
 
-export default function SessionSidebar({ sessions, activeSession, onSelect, onReload, onNewSession, connected }) {
+export default function SessionSidebar({
+  sessions,
+  filteredSessions,
+  filter,
+  onFilterChange,
+  activeSession,
+  onSelect,
+  onReload,
+  onNewSession,
+  connected,
+}) {
   const [showNewSession, setShowNewSession] = useState(false);
-  const [filter, setFilter] = useState('direct'); // 'direct' | 'all'
 
+  // Agent picker uses all sessions (not filtered) so user can create sessions for any agent
   const agents = useMemo(() => extractAgents(sessions), [sessions]);
-
-  const filteredSessions = useMemo(() => {
-    if (filter === 'all') {
-      // All: exclude only cron sessions (automated noise)
-      return sessions.filter((s) => !getSessionKey(s).includes(':cron:'));
-    }
-    // Direct: only clawmander: sessions with a numeric label
-    return sessions.filter((s) => {
-      const key = getSessionKey(s);
-      if (!key.startsWith('clawmander:')) return false;
-      const label = key.split(':')[2] || '';
-      return /^\d+$/.test(label);
-    });
-  }, [sessions, filter]);
 
   const handleReset = async (e, sessionKey) => {
     e.stopPropagation();
@@ -115,7 +111,7 @@ export default function SessionSidebar({ sessions, activeSession, onSelect, onRe
           {FILTER_OPTIONS.map((opt) => (
             <button
               key={opt.key}
-              onClick={() => setFilter(opt.key)}
+              onClick={() => onFilterChange(opt.key)}
               className={`px-1.5 py-0.5 rounded transition-colors ${
                 filter === opt.key ? 'bg-gray-700 text-gray-200' : 'text-gray-600 hover:text-gray-400'
               }`}
@@ -166,7 +162,7 @@ export default function SessionSidebar({ sessions, activeSession, onSelect, onRe
 
       {/* Footer: model info for active session */}
       {activeSession && (() => {
-        const s = sessions.find((x) => getSessionKey(x) === activeSession);
+        const s = sessions.find((x) => (x.key || x.sessionKey) === activeSession);
         if (!s?.model) return null;
         return (
           <div className="px-3 py-2 border-t border-gray-800 text-xs text-gray-600 truncate">
