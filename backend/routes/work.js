@@ -93,6 +93,7 @@ module.exports = function (actionItemService) {
     const brief = {
       id: Date.now().toString(),
       date: req.body.date || new Date().toISOString().split('T')[0],
+      content: req.body.content || '',
       summary: req.body.summary || '',
       priorities: req.body.priorities || [],
       blockers: req.body.blockers || [],
