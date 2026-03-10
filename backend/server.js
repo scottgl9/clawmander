@@ -41,7 +41,7 @@ const serverStatusService = new ServerStatusService(sseManager);
 const chatGatewayClient = new ChatGatewayClient(sseManager, taskService);
 const chatService = new ChatService(chatGatewayClient);
 const personaSyncService = new PersonaSyncService();
-const cronService = new CronService(sseManager, config.openClawHome);
+const cronService = new CronService(sseManager, config.openClawHome, taskService);
 const memoryService = new MemoryService();
 
 // Wire chat events into ChatService for message history tracking
@@ -157,8 +157,9 @@ collector.start();
 // Start Chat gateway client (separate WS connection with write scopes)
 chatGatewayClient.start();
 
-// Start CronService file watcher
+// Start CronService file watcher and reconcile any stuck tasks from previous runs
 cronService.startWatcher();
+cronService.reconcileStuckTasks();
 
 // Start server
 app.listen(config.port, '0.0.0.0', () => {
