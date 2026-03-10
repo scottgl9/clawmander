@@ -103,6 +103,21 @@ module.exports = function (chatGatewayClient, chatService) {
     return upload;
   }
 
+  // GET /api/chat/agents
+  router.get('/agents', async (req, res) => {
+    try {
+      if (!chatGatewayClient.connected) {
+        return res.json({ agents: [], connected: false });
+      }
+      const result = await chatGatewayClient.listAgents();
+      const agents = Array.isArray(result) ? result : (result?.agents || result?.items || []);
+      res.json({ agents, connected: true });
+    } catch (err) {
+      console.error('[Chat] agents list error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // GET /api/chat/sessions
   router.get('/sessions', async (req, res) => {
     try {
