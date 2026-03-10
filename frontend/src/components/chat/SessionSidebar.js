@@ -9,14 +9,15 @@ function getSessionKey(s) {
   return s.key || s.sessionKey;
 }
 
-// Extract unique agent IDs from session keys (agent:<agentId>:... or clawmander:<agentId>:...)
+// Extract unique agent IDs for the "new session" picker.
+// Uses all sessions so agents with only Matrix/Discord sessions still appear.
 function extractAgents(sessions) {
   const seen = new Set();
   for (const s of sessions) {
     const key = getSessionKey(s);
     if (!key) continue;
     const parts = key.split(':');
-    if ((parts[0] === 'agent' || parts[0] === 'clawmander') && parts[1]) seen.add(parts[1]);
+    if (parts[0] === 'agent' && parts[1]) seen.add(parts[1]);
   }
   return [...seen].sort();
 }
