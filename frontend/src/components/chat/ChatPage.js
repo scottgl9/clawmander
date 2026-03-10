@@ -28,6 +28,7 @@ function filterSessions(sessions, filter) {
 
 export default function ChatPage({ onConnectionChange }) {
   const [filter, setFilter] = useState('direct');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(true);
 
   const {
     sessions,
@@ -69,6 +70,11 @@ export default function ChatPage({ onConnectionChange }) {
   // Relay connection state to parent (Layout)
   if (onConnectionChange) onConnectionChange(sseConnected);
 
+  const handleSelectSession = useCallback((key) => {
+    switchSession(key);
+    setMobileSidebarOpen(false);
+  }, [switchSession]);
+
   const handleAction = useCallback((action, payload) => {
     switch (action) {
       case 'switchModel':
@@ -90,78 +96,73 @@ export default function ChatPage({ onConnectionChange }) {
 
   const currentMessages = activeSession ? (messages[activeSession] || []) : [];
 
-  // No filtered sessions available
-  if (connected && sessions.length > 0 && filteredSessions.length === 0) {
-    return (
-      <div className="flex h-full">
-        <SessionSidebar
-          sessions={sessions}
-          filteredSessions={filteredSessions}
-          filter={filter}
-          onFilterChange={setFilter}
-          activeSession={activeSession}
-          connected={connected}
-          onSelect={switchSession}
-          onReload={loadSessions}
-          onNewSession={createSession}
-          models={models}
-        />
-        <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">
-          No sessions match the current filter
-        </div>
-      </div>
-    );
-  }
+  const activeSessionObj = sessions.find((s) => getSessionKey(s) === activeSession);
+  const activeSessionLabel = activeSessionObj?.displayName || activeSessionObj?.agentId || activeSession?.split(':')[1] || 'Chat';
+
+  const sidebar = (
+    <SessionSidebar
+      sessions={sessions}
+      filteredSessions={filteredSessions}
+      filter={filter}
+      onFilterChange={setFilter}
+      activeSession={activeSession}
+      connected={connected}
+      onSelect={handleSelectSession}
+      onReload={loadSessions}
+      onNewSession={createSession}
+      models={models}
+    />
+  );
 
   return (
     <div className="flex h-full">
-      {/* Session sidebar */}
-      <SessionSidebar
-        sessions={sessions}
-        filteredSessions={filteredSessions}
-        filter={filter}
-        onFilterChange={setFilter}
-        activeSession={activeSession}
-        connected={connected}
-        onSelect={switchSession}
-        onReload={loadSessions}
-        onNewSession={createSession}
-        models={models}
-      />
+      {/* Session sidebar — full screen on mobile when open, fixed column on desktop */}
+      <div className={`${mobileSidebarOpen ? 'flex' : 'hidden'} md:flex w-full md:w-auto flex-shrink-0`}>
+        {sidebar}
+      </div>
 
-      {/* Main chat area */}
-      <div className="flex flex-col flex-1 min-w-0">
-        {/* Presence bar — only filtered sessions */}
+      {/* Main chat area — full screen on mobile when sidebar is closed */}
+      <div className={`${!mobileSidebarOpen ? 'flex' : 'hidden'} md:flex flex-col flex-1 min-w-0`}>
+
+        {/* Mobile header: back button + session name */}
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-800 md:hidden bg-gray-900">
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            className="flex items-center gap-1 text-sm text-gray-400 hover:text-white transition-colors"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+            </svg>
+            Sessions
+          </button>
+          <span className="text-sm font-medium text-gray-300 truncate">{activeSessionLabel}</span>
+        </div>
+
+        {/* Presence bar */}
         <AgentPresenceBar sessions={filteredSessions} activeSession={activeSession} />
 
-        {/* No session selected */}
-        {!activeSession ? (
+        {connected && sessions.length > 0 && filteredSessions.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">
+            No sessions match the current filter
+          </div>
+        ) : !activeSession ? (
           <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">
             {connected ? 'Select a session to start chatting' : 'Waiting for gateway connection...'}
           </div>
         ) : (
           <>
-            {/* Messages */}
             <MessageList messages={currentMessages} loading={loadingHistory} />
-
-            {/* Subagent activity */}
             <SubagentBadge activity={subagentActivity} />
-
-            {/* Approval banner */}
             <ApprovalBanner
               approval={approvalPending}
               onResolved={() => setApprovalPending(null)}
             />
-
-            {/* Error banner */}
             {error && (
               <div className="mx-4 mb-2 px-3 py-2 bg-red-900/30 border border-red-700/50 rounded text-sm text-red-300 flex items-center justify-between">
                 <span>{error}</span>
                 <button onClick={() => setError(null)} className="ml-2 text-red-500 hover:text-red-300">×</button>
               </div>
             )}
-
-            {/* Input */}
             <ChatInput
               onSend={sendMessage}
               onAbort={handleAbort}
