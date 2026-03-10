@@ -319,9 +319,11 @@ export function useChatState() {
     }
   }, [activeSession, injectSystemMessage, loadSessions, setError]);
 
-  // Create a new direct session for an agent, numbered sequentially (e.g. clawmander:work-agent:1)
+  // Create a new direct session for an agent, numbered sequentially (e.g. agent:qwen-agent:clawmander:1)
+  // Format: agent:<agentId>:clawmander:<N> so the gateway routes to the correct agent.
   const createSession = useCallback(async (agentId) => {
-    const prefix = `clawmander:${agentId}:`;
+    const suffix = `:clawmander:`;
+    const prefix = `agent:${agentId}${suffix}`;
     const nums = sessions
       .map((s) => s.key || s.sessionKey || '')
       .filter((k) => k.startsWith(prefix))
