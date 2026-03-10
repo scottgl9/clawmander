@@ -6,7 +6,7 @@ export default function MessageList({ messages, loading }) {
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    bottomRef.current?.scrollIntoView({ behavior: 'instant' });
   }, [messages]);
 
   if (loading) {
