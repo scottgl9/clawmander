@@ -33,8 +33,11 @@ export default function SessionSidebar({ sessions, activeSession, onSelect, onRe
   const agents = useMemo(() => extractAgents(sessions), [sessions]);
 
   const filteredSessions = useMemo(() => {
-    if (filter === 'all') return sessions;
-    // 'direct' — only show clawmander: sessions with a numeric label
+    if (filter === 'all') {
+      // All: exclude only cron sessions (automated noise)
+      return sessions.filter((s) => !getSessionKey(s).includes(':cron:'));
+    }
+    // Direct: only clawmander: sessions with a numeric label
     return sessions.filter((s) => {
       const key = getSessionKey(s);
       if (!key.startsWith('clawmander:')) return false;

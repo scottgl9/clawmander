@@ -110,19 +110,8 @@ module.exports = function (chatGatewayClient, chatService) {
         return res.json({ sessions: [], connected: false });
       }
       const result = await chatGatewayClient.listSessions({ includeGlobal: false });
-      // Filter to direct/relevant sessions only
       const sessions = Array.isArray(result) ? result : (result?.sessions || result?.items || []);
-      const filtered = sessions.filter((s) => {
-        const key = s.key || s.sessionKey || '';
-        const kind = s.kind || '';
-        if (kind === 'group') return false;
-        if (key.includes(':cron:')) return false;
-        if (key.startsWith('discord:') || key.includes(':discord:')) return false;
-        if (key.startsWith('matrix:') || key.includes(':matrix:')) return false;
-        if (SYSTEM_USERNAME && key.includes(SYSTEM_USERNAME)) return false;
-        return true;
-      });
-      res.json({ sessions: filtered, connected: true });
+      res.json({ sessions, connected: true });
     } catch (err) {
       console.error('[Chat] sessions list error:', err.message);
       res.status(500).json({ error: err.message });
