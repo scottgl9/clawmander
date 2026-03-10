@@ -9,20 +9,16 @@ const components = {
   ul: ({ children }) => <ul className="list-disc list-inside space-y-0.5 mb-2 text-gray-200">{children}</ul>,
   ol: ({ children }) => <ol className="list-decimal list-inside space-y-0.5 mb-2 text-gray-200">{children}</ol>,
   li: ({ children }) => <li className="text-gray-200">{children}</li>,
-  code: ({ inline, className, children }) => {
-    if (inline) {
-      return (
-        <code className="px-1 py-0.5 bg-gray-800 text-green-300 rounded text-[12px] font-mono">
-          {children}
-        </code>
-      );
-    }
-    return (
-      <pre className="bg-gray-900 border border-gray-700 rounded-lg p-3 my-2 overflow-x-auto">
-        <code className="text-green-300 text-[12px] font-mono whitespace-pre">{children}</code>
-      </pre>
-    );
-  },
+  code: ({ children }) => (
+    <code className="px-1 py-0.5 bg-gray-800 text-green-300 rounded text-[12px] font-mono">
+      {children}
+    </code>
+  ),
+  pre: ({ children }) => (
+    <pre className="bg-gray-900 border border-gray-700 rounded-lg p-3 my-2 overflow-x-auto">
+      {children}
+    </pre>
+  ),
   blockquote: ({ children }) => (
     <blockquote className="border-l-2 border-blue-500 pl-3 my-2 text-gray-400 italic">
       {children}
