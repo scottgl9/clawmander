@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSSE } from '../../hooks/useSSE';
 import { useChatState } from '../../hooks/useChatState';
 import { chatApi } from '../../lib/chatApi';
@@ -53,6 +53,15 @@ export default function ChatPage({ onConnectionChange }) {
   } = useChatState();
 
   const filteredSessions = useMemo(() => filterSessions(sessions, filter), [sessions, filter]);
+
+  // Auto-select first filtered session when sessions load or filter changes
+  useEffect(() => {
+    if (filteredSessions.length === 0) return;
+    const activeInFiltered = filteredSessions.some((s) => getSessionKey(s) === activeSession);
+    if (!activeInFiltered) {
+      switchSession(getSessionKey(filteredSessions[0]));
+    }
+  }, [filteredSessions]);
 
   // Connect SSE
   const sseConnected = useSSE(handleSSEEvent);

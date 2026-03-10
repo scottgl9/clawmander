@@ -8,9 +8,10 @@ const activityRoutes = require('./activity');
 const sseRoutes = require('./sse');
 const serverRoutes = require('./server');
 const chatRoutes = require('./chat');
+const personaSyncRoutes = require('./personasync');
 
 module.exports = function mountRoutes(app, services) {
-  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService } = services;
+  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService } = services;
 
   app.use('/api/agents', agentsRoutes(agentService, heartbeatService));
 
@@ -32,4 +33,5 @@ module.exports = function mountRoutes(app, services) {
   app.use('/api/sse', sseRoutes(sseManager));
   app.use('/api/server', serverRoutes(serverStatusService));
   app.use('/api/chat', chatRoutes(chatGatewayClient, chatService));
+  app.use('/api', personaSyncRoutes(personaSyncService));
 };

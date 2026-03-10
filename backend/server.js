@@ -12,6 +12,7 @@ const ServerStatusService = require('./services/ServerStatusService');
 const OpenClawCollector = require('./collectors/OpenClawCollector');
 const ChatGatewayClient = require('./services/ChatGatewayClient');
 const ChatService = require('./services/ChatService');
+const PersonaSyncService = require('./services/PersonaSyncService');
 const mountRoutes = require('./routes');
 const { activityLogger } = require('./middleware/logger');
 
@@ -37,6 +38,7 @@ const actionItemService = new ActionItemService(sseManager);
 const serverStatusService = new ServerStatusService(sseManager);
 const chatGatewayClient = new ChatGatewayClient(sseManager, taskService);
 const chatService = new ChatService(chatGatewayClient);
+const personaSyncService = new PersonaSyncService();
 
 // Wire chat events into ChatService for message history tracking
 sseManager._origBroadcast = sseManager.broadcast.bind(sseManager);
@@ -50,7 +52,7 @@ sseManager.broadcast = function (event, data) {
 };
 
 // Routes
-mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService });
+mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService });
 
 // Health check
 app.get('/api/health', (req, res) => {
