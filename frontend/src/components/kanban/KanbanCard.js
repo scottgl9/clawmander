@@ -1,10 +1,45 @@
 import { useState, useEffect } from 'react';
 import AgentAvatar from './AgentAvatar';
-import HeartbeatTimer from './HeartbeatTimer';
 import ProgressBar from '../shared/ProgressBar';
 import { PriorityBadge } from '../shared/Badge';
 
-export default function KanbanCard({ task, agent, heartbeat, onClick }) {
+function shortSessionKey(sessionKey) {
+  if (!sessionKey) return null;
+  const parts = sessionKey.split(':');
+  if (parts[0] === 'agent' && parts.length >= 3) {
+    const rest = parts.slice(2);
+    if (rest[0] === 'clawmander') return `clawmander:${rest[1] || ''}`;
+    if (rest.length >= 2) return `${rest[0]}:${rest[1]}`;
+    return rest[0];
+  }
+  return sessionKey.slice(0, 24);
+}
+
+function formatElapsed(ms) {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  if (h > 0) return `${h}h ${m % 60}m`;
+  if (m > 0) return `${m}m ${s % 60}s`;
+  return `${s}s`;
+}
+
+function ElapsedTimer({ since }) {
+  const [elapsed, setElapsed] = useState(() => Date.now() - new Date(since).getTime());
+
+  useEffect(() => {
+    const id = setInterval(() => setElapsed(Date.now() - new Date(since).getTime()), 1000);
+    return () => clearInterval(id);
+  }, [since]);
+
+  return (
+    <span className="text-[10px] font-mono text-green-500 tabular-nums" title="Elapsed time">
+      {formatElapsed(elapsed)}
+    </span>
+  );
+}
+
+export default function KanbanCard({ task, agent, onClick }) {
   const [timeAgo, setTimeAgo] = useState('');
 
   useEffect(() => {
@@ -12,6 +47,8 @@ export default function KanbanCard({ task, agent, heartbeat, onClick }) {
       setTimeAgo(formatTimeAgo(new Date(task.updatedAt)));
     }
   }, [task.updatedAt]);
+
+  const sessionLabel = shortSessionKey(task.sessionKey);
 
   return (
     <div
@@ -27,6 +64,12 @@ export default function KanbanCard({ task, agent, heartbeat, onClick }) {
         </div>
         <PriorityBadge priority={task.priority} />
       </div>
+
+      {sessionLabel && (
+        <p className="text-[10px] text-gray-600 mb-2 truncate" title={task.sessionKey}>
+          {sessionLabel}
+        </p>
+      )}
 
       {task.description && (
         <p className="text-xs text-gray-500 mb-2 line-clamp-2">{task.description}</p>
@@ -55,11 +98,8 @@ export default function KanbanCard({ task, agent, heartbeat, onClick }) {
       <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-800">
         <div className="flex items-center gap-2">
           {agent && <AgentAvatar name={agent.name} status={agent.status} />}
-          {heartbeat && (
-            <HeartbeatTimer
-              nextHeartbeat={heartbeat.nextHeartbeat}
-              heartbeatInterval={heartbeat.heartbeatInterval}
-            />
+          {task.status === 'in_progress' && task.createdAt && (
+            <ElapsedTimer since={task.createdAt} />
           )}
         </div>
         <span className="text-[10px] text-gray-600">{timeAgo}</span>
