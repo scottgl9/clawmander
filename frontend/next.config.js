@@ -7,8 +7,23 @@ const withPWA = require('next-pwa')({
   disable: process.env.NODE_ENV === 'development',
   customWorkerDir: 'worker',
   runtimeCaching: [
-    // SSE removed — bypassed via custom worker entry (worker/index.js)
-    ...defaultCache,
+    // Replace the default 'apis' entry to exclude SSE — it must reach the
+    // browser natively; passing a streaming response through the SW breaks
+    // EventSource on mobile.
+    {
+      urlPattern: ({ url, sameOrigin }) => {
+        if (!sameOrigin) return false;
+        const p = url.pathname;
+        return !p.startsWith('/api/auth/') && !p.startsWith('/api/sse/') && p.startsWith('/api/');
+      },
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'apis',
+        networkTimeoutSeconds: 10,
+        expiration: { maxEntries: 16, maxAgeSeconds: 86400 },
+      },
+    },
+    ...defaultCache.filter((_, i) => i !== 11), // remove default apis entry
   ],
 });
 

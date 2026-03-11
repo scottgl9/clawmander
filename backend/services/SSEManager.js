@@ -10,7 +10,9 @@ class SSEManager {
       Connection: 'keep-alive',
       'Access-Control-Allow-Origin': '*',
     });
+    res.flushHeaders();
     res.write('data: {"type":"connected"}\n\n');
+    if (typeof res.flush === 'function') res.flush();
     this.clients.add(res);
     res.on('close', () => this.clients.delete(res));
   }
@@ -19,6 +21,7 @@ class SSEManager {
     const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const client of this.clients) {
       client.write(payload);
+      if (typeof client.flush === 'function') client.flush();
     }
   }
 
