@@ -10,7 +10,7 @@ const { identity: deviceIdentity, buildAuthPayloadV3, sign: signPayload, publicK
 // OpenClaw runtime injects system notifications into chat sessions to inform agents
 // about background task completions, exec results, etc. Filter these from the UI.
 const OPENCLAW_SYSTEM_NOTIFICATION_RE = /^(?:System:\s*)?\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)/;
-const OPENCLAW_NOTIFICATION_SUFFIX_RE = /\n?(?:System:\s*)?\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)[\s\S]*/;
+const OPENCLAW_NOTIFICATION_SUFFIX_RE = /\nSystem: \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)[\s\S]*/;
 
 class ChatGatewayClient {
   constructor(sseManager, taskService) {
