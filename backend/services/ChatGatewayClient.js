@@ -7,10 +7,7 @@ const WebSocket = require('ws');
 const config = require('../config/config');
 const { identity: deviceIdentity, buildAuthPayloadV3, sign: signPayload, publicKeyRawBase64Url } = require('./DeviceIdentity');
 
-// OpenClaw runtime injects system notifications into chat sessions to inform agents
-// about background task completions, exec results, etc. Filter these from the UI.
-const OPENCLAW_SYSTEM_NOTIFICATION_RE = /^(?:System:\s*)?\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)/;
-const OPENCLAW_NOTIFICATION_SUFFIX_RE = /\nSystem: \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)[\s\S]*/;
+
 
 class ChatGatewayClient {
   constructor(sseManager, taskService) {
@@ -463,11 +460,6 @@ class ChatGatewayClient {
     } else if (message.text) {
       text = message.text;
     }
-
-    // Suppress messages that are entirely a system notification
-    if (text && OPENCLAW_SYSTEM_NOTIFICATION_RE.test(text.trimStart())) return '';
-    // Strip system notifications appended to the end of a real user message
-    if (text) text = text.replace(OPENCLAW_NOTIFICATION_SUFFIX_RE, '').trimEnd();
 
     return text;
   }
