@@ -2,7 +2,7 @@ export default function AgentPresenceBar({ sessions, activeSession }) {
   if (!sessions || sessions.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-800 overflow-x-auto">
+    <div className="hidden md:flex items-center gap-3 px-4 py-2 border-b border-gray-800 overflow-x-auto">
       <span className="text-xs text-gray-600 flex-shrink-0">Sessions:</span>
       {sessions.slice(0, 8).map((s) => {
         const key = s.key || s.sessionKey;
