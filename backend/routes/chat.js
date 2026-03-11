@@ -41,8 +41,10 @@ function extractGatewayText(msg) {
 
   // String content
   if (typeof content === 'string') {
-    // Skip if entire content is raw JSON (tool output)
+    // Skip raw JSON tool output
     if (looksLikeRawJSON(content)) return '';
+    // Skip OpenClaw runtime system notifications (exec completions, etc.)
+    if (isOpenClawSystemNotification(content)) return '';
     // Strip EXTERNAL_UNTRUSTED_CONTENT wrapper tags
     return stripUntrustedWrappers(content);
   }
@@ -71,6 +73,22 @@ function extractGatewayText(msg) {
 
   if (msg.text) return stripUntrustedWrappers(msg.text);
   return '';
+}
+
+// Detect OpenClaw runtime system notifications injected into chat sessions.
+// These are internal plumbing messages (exec completions, heartbeats, etc.)
+// delivered by the gateway to keep agents informed — they should never be
+// surfaced in the Clawmander chat UI.
+//
+// Examples:
+//   [2026-03-10 22:32:14 CDT] Exec completed (good-rid, code 0) :: ...
+//   [2026-03-10 22:32:14 CDT] Exec started (session-id) :: ...
+//   System: [2026-03-10 22:32:14 CDT] Exec completed ...
+const OPENCLAW_SYSTEM_NOTIFICATION_RE = /^(?:System:\s*)?\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)/;
+
+function isOpenClawSystemNotification(text) {
+  if (!text || typeof text !== 'string') return false;
+  return OPENCLAW_SYSTEM_NOTIFICATION_RE.test(text.trimStart());
 }
 
 // Detect raw JSON blobs (tool output like web search results)
