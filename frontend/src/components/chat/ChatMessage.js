@@ -36,46 +36,52 @@ export default function ChatMessage({ message }) {
       )}
 
       <div className={`max-w-[85%] min-w-0 ${isUser ? 'items-end' : 'items-start'} flex flex-col`}>
-        {/* Bubble */}
-        <div
-          className={`px-3 py-2 rounded-2xl text-sm leading-relaxed min-w-0 overflow-hidden ${
-            isUser
-              ? 'bg-blue-600 text-white rounded-tr-sm'
-              : isError
-              ? 'bg-red-900/40 border border-red-700/50 text-red-300 rounded-tl-sm'
-              : 'bg-gray-800 text-gray-100 rounded-tl-sm'
-          }`}
-        >
-          {isUser ? (
-            <div className="whitespace-pre-wrap">{message.content}</div>
-          ) : (
-            <>
-              {message.content ? (
-                <MarkdownContent content={message.content} />
-              ) : isStreaming ? null : (
-                <span className="text-gray-500 italic">Empty response</span>
-              )}
-              {isStreaming && !message.content && <StreamingIndicator />}
-              {isStreaming && message.content && (
-                <span className="inline-block ml-1">
-                  <StreamingIndicator />
-                </span>
-              )}
-              {isAborted && (
-                <span className="text-xs text-gray-500 italic ml-1">[aborted]</span>
-              )}
-            </>
-          )}
+        {/* Bubble — only rendered when there is content */}
+        {(message.content || isError || isAborted || (isStreaming && !message.content)) && (
+          <div
+            className={`px-3 py-2 rounded-2xl text-sm leading-relaxed min-w-0 overflow-hidden ${
+              isUser
+                ? 'bg-blue-600 text-white rounded-tr-sm'
+                : isError
+                ? 'bg-red-900/40 border border-red-700/50 text-red-300 rounded-tl-sm'
+                : 'bg-gray-800 text-gray-100 rounded-tl-sm'
+            }`}
+          >
+            {isUser ? (
+              <div className="whitespace-pre-wrap">{message.content}</div>
+            ) : (
+              <>
+                {message.content ? (
+                  <MarkdownContent content={message.content} />
+                ) : isStreaming ? (
+                  /* Empty streaming bubble — dots shown below, nothing in bubble */
+                  null
+                ) : (
+                  <span className="text-gray-500 italic">Empty response</span>
+                )}
+                {isAborted && (
+                  <span className="text-xs text-gray-500 italic">[aborted]</span>
+                )}
+              </>
+            )}
 
-          {/* Image attachments */}
-          {message.attachments && message.attachments.length > 0 && (
-            <div className="mt-1">
-              {message.attachments.map((att, i) => (
-                <ImageAttachment key={i} url={att.url} filename={att.filename || att.originalname} />
-              ))}
-            </div>
-          )}
-        </div>
+            {/* Image attachments */}
+            {message.attachments && message.attachments.length > 0 && (
+              <div className="mt-1">
+                {message.attachments.map((att, i) => (
+                  <ImageAttachment key={i} url={att.url} filename={att.filename || att.originalname} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Streaming indicator — always OUTSIDE the bubble */}
+        {isStreaming && (
+          <div className="mt-1.5 ml-1">
+            <StreamingIndicator />
+          </div>
+        )}
 
         {/* Timestamp */}
         <div className={`text-[10px] text-gray-600 mt-0.5 ${isUser ? 'text-right' : 'text-left'}`}>
