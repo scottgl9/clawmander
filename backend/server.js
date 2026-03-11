@@ -170,8 +170,7 @@ cronService.startWatcher();
 cronService.reconcileStuckTasks();
 
 // Start server
-app.listen(config.port, '0.0.0.0', () => {
-  console.log(`[Clawmander] Backend running on 0.0.0.0:${config.port}`);
+app.listen(config.port, '127.0.0.1', () => {
+  console.log(`[Clawmander] Backend running on 127.0.0.1:${config.port}`);
   console.log(`[Clawmander] SSE endpoint: http://localhost:${config.port}/api/sse/subscribe`);
-  console.log(`[Clawmander] LAN access: http://192.168.1.104:${config.port}`);
 });
