@@ -143,3 +143,8 @@ backend/storage/data/*.json
 backend/storage/data/*.db
 backend/storage/data/*.db-wal
 backend/storage/data/*.db-shm
+backend/storage/data/
+
+# Next.js generated service worker / workbox files
+frontend/public/sw.js
+frontend/public/worker-*.js
