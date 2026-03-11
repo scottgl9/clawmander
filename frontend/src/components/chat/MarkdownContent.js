@@ -9,13 +9,24 @@ const components = {
   ul: ({ children }) => <ul className="list-disc list-inside space-y-0.5 mb-2 text-gray-200">{children}</ul>,
   ol: ({ children }) => <ol className="list-decimal list-inside space-y-0.5 mb-2 text-gray-200">{children}</ol>,
   li: ({ children }) => <li className="text-gray-200">{children}</li>,
-  code: ({ children }) => (
-    <code className="px-1 py-0.5 bg-gray-800 text-green-300 rounded text-[12px] font-mono">
-      {children}
-    </code>
-  ),
+  code: ({ node, inline, className, children, ...props }) => {
+    // Block code (inside <pre>) vs inline code
+    if (!inline && !className?.includes('inline')) {
+      // Block code — no extra styling, let <pre> handle it
+      return (
+        <code className="text-green-300 text-[12px] font-mono" {...props}>
+          {children}
+        </code>
+      );
+    }
+    return (
+      <code className="px-1 py-0.5 bg-gray-800 text-green-300 rounded text-[12px] font-mono" {...props}>
+        {children}
+      </code>
+    );
+  },
   pre: ({ children }) => (
-    <pre className="bg-gray-900 border border-gray-700 rounded-lg p-3 my-2 overflow-x-auto">
+    <pre className="bg-gray-900 border border-gray-700 rounded-lg p-3 my-2 overflow-x-auto max-w-full">
       {children}
     </pre>
   ),
