@@ -10,6 +10,7 @@ const { identity: deviceIdentity, buildAuthPayloadV3, sign: signPayload, publicK
 // OpenClaw runtime injects system notifications into chat sessions to inform agents
 // about background task completions, exec results, etc. Filter these from the UI.
 const OPENCLAW_SYSTEM_NOTIFICATION_RE = /^(?:System:\s*)?\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)/;
+const OPENCLAW_NOTIFICATION_SUFFIX_RE = /\n?(?:System:\s*)?\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)[\s\S]*/;
 
 class ChatGatewayClient {
   constructor(sseManager, taskService) {
@@ -457,13 +458,16 @@ class ChatGatewayClient {
         .filter((b) => b.type === 'text')
         .map((b) => b.text || '')
         .join('');
+    } else if (typeof message.content === 'string') {
+      text = message.content;
     } else if (message.text) {
       text = message.text;
     }
 
-    // Suppress OpenClaw runtime system notifications (exec completions, heartbeats, etc.)
-    // These are injected by the gateway to inform agents — not for display in the chat UI.
+    // Suppress messages that are entirely a system notification
     if (text && OPENCLAW_SYSTEM_NOTIFICATION_RE.test(text.trimStart())) return '';
+    // Strip system notifications appended to the end of a real user message
+    if (text) text = text.replace(OPENCLAW_NOTIFICATION_SUFFIX_RE, '').trimEnd();
 
     return text;
   }
