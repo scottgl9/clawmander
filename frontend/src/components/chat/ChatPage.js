@@ -102,6 +102,17 @@ export default function ChatPage({ onConnectionChange }) {
     setDropdownOpen((o) => !o);
   }, []);
 
+  // Recalculate dropdown position on window resize / orientation change
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const update = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (rect) setDropdownRect(rect);
+    };
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [dropdownOpen]);
+
   const currentMessages = activeSession ? (messages[activeSession] || []) : [];
   const activeSessionObj = sessions.find((s) => getSessionKey(s) === activeSession);
   const activeSessionLabel = activeSessionObj ? getSessionLabel(activeSessionObj) : 'Chat';
@@ -184,18 +195,25 @@ export default function ChatPage({ onConnectionChange }) {
       </div>
 
       {/* Session dropdown — fixed position so it escapes all overflow:hidden ancestors */}
-      {dropdownOpen && dropdownRect && (
+      {dropdownOpen && dropdownRect && (() => {
+        const MARGIN = 8;
+        const top = dropdownRect.bottom + 4;
+        const viewportH = typeof window !== 'undefined' ? window.innerHeight : 800;
+        // Max height: space from dropdown top to bottom of viewport minus margin
+        const maxH = Math.max(120, viewportH - top - MARGIN);
+        return (
         <div
           ref={dropdownRef}
-          className="md:hidden fixed z-50 bg-gray-900 border border-gray-700 rounded-xl shadow-xl overflow-hidden"
+          className="md:hidden fixed z-50 bg-gray-900 border border-gray-700 rounded-xl shadow-xl flex flex-col"
           style={{
-            top: dropdownRect.bottom + 4,
+            top,
             left: dropdownRect.left,
             width: dropdownRect.width,
+            maxHeight: maxH,
           }}
         >
           {/* Filter tabs */}
-          <div className="flex border-b border-gray-800">
+          <div className="flex border-b border-gray-800 flex-shrink-0">
             {FILTER_OPTIONS.map((opt) => (
               <button
                 key={opt.key}
@@ -209,8 +227,8 @@ export default function ChatPage({ onConnectionChange }) {
             ))}
           </div>
 
-          {/* Session list */}
-          <div className="max-h-60 overflow-y-auto">
+          {/* Session list — scrollable within the available space */}
+          <div className="overflow-y-auto flex-1">
             {filteredSessions.length === 0 ? (
               <div className="px-4 py-4 text-center text-sm text-gray-600">No sessions</div>
             ) : (
@@ -241,7 +259,8 @@ export default function ChatPage({ onConnectionChange }) {
             )}
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
