@@ -18,6 +18,7 @@ const CronService = require('./services/CronService');
 const MemoryService = require('./services/MemoryService');
 const DrawingService = require('./services/DrawingService');
 const TerminalService = require('./services/TerminalService');
+const AuthDB = require('./storage/AuthDB');
 const { attachTerminalWS } = require('./routes/terminal');
 const mountRoutes = require('./routes');
 const { activityLogger } = require('./middleware/logger');
@@ -52,6 +53,7 @@ const serverStatusService = new ServerStatusService(sseManager);
 const chatGatewayClient = new ChatGatewayClient(sseManager, taskService);
 const chatService = new ChatService(chatGatewayClient);
 const personaSyncService = new PersonaSyncService();
+const authDB = new AuthDB();
 const cronService = new CronService(sseManager, config.openClawHome, taskService);
 const memoryService = new MemoryService();
 const drawingService = new DrawingService(sseManager);
@@ -69,7 +71,7 @@ sseManager.broadcast = function (event, data) {
 };
 
 // Routes
-mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService, cronService, memoryService, drawingService, config });
+mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService, cronService, memoryService, drawingService, config, authDB });
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -147,6 +149,9 @@ if (config.testMode) {
 } else {
   console.log('[Production Mode] Starting with empty data store');
 }
+
+// Hourly: cleanup expired refresh tokens
+setInterval(() => authDB.cleanupExpiredTokens(), 60 * 60 * 1000);
 
 // Cleanup stale tasks on startup
 taskService.cleanupDoneTasks();
