@@ -72,20 +72,34 @@ frontend/src/
 ├── components/
 │   ├── layout/         # Layout components (Header, Sidebar, Layout)
 │   ├── kanban/         # Kanban board components
+│   ├── chat/           # Chat UI (ChatPage, ChatInput, ChatMessage, etc.)
+│   ├── drawings/       # Excalidraw canvas (DrawPage, DrawingSidebar, ExcalidrawWrapper)
+│   ├── voice/          # Voice page (VoicePage, VoiceSettingsPanel)
+│   ├── server/         # Server settings (ServiceSettings)
 │   ├── shared/         # Reusable UI components
 │   ├── work/           # Work-related widgets
 │   ├── budget/         # Budget widgets and charts
 │   ├── jobs/           # Job listing components
 │   └── activity/       # Activity log component
 ├── hooks/
-│   ├── useSSE.js       # SSE connection hook
-│   └── useAPI.js       # API fetch hook
+│   ├── useSSE.js              # SSE connection hook
+│   ├── useAPI.js              # API fetch hook
+│   ├── useChatState.js        # Chat session + message state
+│   ├── useSpeechRecognition.js # Web Speech API wrapper (STT)
+│   ├── useTextToSpeech.js     # TTS via Chatterbox backend proxy
+│   ├── useVoiceSettings.js    # Voice preferences (localStorage)
+│   └── useServiceSettings.js  # Service URLs (localStorage)
 ├── lib/
-│   ├── api.js          # API client functions
+│   ├── api.js          # API client (tasks, drawings, etc.)
+│   ├── chatApi.js      # Chat + voice API client
 │   └── constants.js    # App-wide constants
 ├── pages/
 │   ├── index.js        # Main dashboard (agent status dot + widgets)
 │   ├── agents.js       # Agent task kanban board
+│   ├── chat.js         # Chat with agents
+│   ├── draw.js         # Excalidraw drawing canvas
+│   ├── voice.js        # Hands-free voice conversation
+│   ├── server.js       # Server status + service settings
 │   ├── daily.js        # Daily view
 │   ├── weekly.js       # Weekly view
 │   ├── monthly.js      # Monthly view
@@ -157,6 +171,9 @@ backend/
 │   ├── agents.js               # Agent endpoints
 │   ├── tasks.js                # Task endpoints
 │   ├── sse.js                  # SSE endpoint
+│   ├── chat.js                 # Chat proxy endpoints
+│   ├── drawings.js             # Excalidraw CRUD endpoints
+│   ├── voice.js                # TTS proxy + status endpoint
 │   └── ...                     # Other routes
 ├── services/
 │   ├── TaskService.js          # Task business logic
