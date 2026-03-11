@@ -17,6 +17,8 @@ const PersonaSyncService = require('./services/PersonaSyncService');
 const CronService = require('./services/CronService');
 const MemoryService = require('./services/MemoryService');
 const DrawingService = require('./services/DrawingService');
+const TerminalService = require('./services/TerminalService');
+const { attachTerminalWS } = require('./routes/terminal');
 const mountRoutes = require('./routes');
 const { activityLogger } = require('./middleware/logger');
 
@@ -53,6 +55,7 @@ const personaSyncService = new PersonaSyncService();
 const cronService = new CronService(sseManager, config.openClawHome, taskService);
 const memoryService = new MemoryService();
 const drawingService = new DrawingService(sseManager);
+const terminalService = new TerminalService();
 
 // Wire chat events into ChatService for message history tracking
 sseManager._origBroadcast = sseManager.broadcast.bind(sseManager);
@@ -172,7 +175,16 @@ cronService.startWatcher();
 cronService.reconcileStuckTasks();
 
 // Start server
-app.listen(config.port, '127.0.0.1', () => {
+const server = app.listen(config.port, '127.0.0.1', () => {
   console.log(`[Clawmander] Backend running on 127.0.0.1:${config.port}`);
   console.log(`[Clawmander] SSE endpoint: http://localhost:${config.port}/api/sse/subscribe`);
+});
+
+// Attach terminal WebSocket to the HTTP server
+attachTerminalWS(server, terminalService);
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  terminalService.destroyAll();
+  server.close();
 });
