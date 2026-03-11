@@ -78,10 +78,15 @@ class ChatService {
     // Create placeholder for streaming assistant response
     const assistantMsg = this.addMessage(sessionKey, 'assistant', '', runId, 'streaming');
 
-    // Send to gateway
-    await this.gateway.sendMessage(sessionKey, message, attachments, runId);
+    // Send to gateway — the response may contain the gateway's own runId for this run.
+    // Use it if available so the frontend placeholder's runId matches SSE event runIds.
+    const result = await this.gateway.sendMessage(sessionKey, message, attachments, runId);
+    const actualRunId = result?.runId || runId;
+    if (actualRunId !== runId) {
+      this.updateMessage(assistantMsg.id, { runId: actualRunId });
+    }
 
-    return { runId, messageId: assistantMsg.id };
+    return { runId: actualRunId, messageId: assistantMsg.id };
   }
 
   // Called when delta arrives (via SSE handler in routes/chat.js)
