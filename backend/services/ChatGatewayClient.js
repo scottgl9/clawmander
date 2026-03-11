@@ -7,6 +7,10 @@ const WebSocket = require('ws');
 const config = require('../config/config');
 const { identity: deviceIdentity, buildAuthPayloadV3, sign: signPayload, publicKeyRawBase64Url } = require('./DeviceIdentity');
 
+// OpenClaw runtime injects system notifications into chat sessions to inform agents
+// about background task completions, exec results, etc. Filter these from the UI.
+const OPENCLAW_SYSTEM_NOTIFICATION_RE = /^(?:System:\s*)?\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)/;
+
 class ChatGatewayClient {
   constructor(sseManager, taskService) {
     this.sse = sseManager;
@@ -446,14 +450,22 @@ class ChatGatewayClient {
     // Plain strings are tool outputs / raw content, not assistant streaming text — skip them.
     // Legitimate streaming deltas always arrive as { content: [...] } objects.
     if (typeof message === 'string') return '';
+
+    let text = '';
     if (Array.isArray(message.content)) {
-      return message.content
+      text = message.content
         .filter((b) => b.type === 'text')
         .map((b) => b.text || '')
         .join('');
+    } else if (message.text) {
+      text = message.text;
     }
-    if (message.text) return message.text;
-    return '';
+
+    // Suppress OpenClaw runtime system notifications (exec completions, heartbeats, etc.)
+    // These are injected by the gateway to inform agents — not for display in the chat UI.
+    if (text && OPENCLAW_SYSTEM_NOTIFICATION_RE.test(text.trimStart())) return '';
+
+    return text;
   }
 
   // --- Public RPC Methods ---
