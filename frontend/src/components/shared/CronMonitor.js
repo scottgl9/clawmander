@@ -27,8 +27,8 @@ function timeUntil(isoString) {
   return `in ${days}d`;
 }
 
-export default function CronMonitor() {
-  const { data: jobs, loading, error } = useAPI(() => api.cron.getJobs());
+export default function CronMonitor({ refreshKey }) {
+  const { data: jobs, loading, error } = useAPI(() => api.cron.getJobs(), [refreshKey]);
   const [expandedId, setExpandedId] = useState(null);
   const [runHistory, setRunHistory] = useState({});
 

@@ -2,8 +2,8 @@ import { useAPI } from '../../hooks/useAPI';
 import { api } from '../../lib/api';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts';
 
-export default function TrendChart() {
-  const { data, loading, error } = useAPI(() => api.budget.getTrends());
+export default function TrendChart({ refreshKey }) {
+  const { data, loading, error } = useAPI(() => api.budget.getTrends(), [refreshKey]);
 
   if (loading) return <div className="text-gray-600 text-xs">Loading...</div>;
   if (error) return <div className="text-red-400 text-xs">{error}</div>;

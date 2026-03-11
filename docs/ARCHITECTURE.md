@@ -102,18 +102,25 @@ frontend/src/
 
 **1. Server-Sent Events (SSE) for Real-time**
 - No WebSocket complexity on frontend
-- Auto-reconnect built into EventSource
+- Auto-reconnect built into EventSource with reconnection detection
+- `useSSE` emits synthetic `sse.reconnected` event on reconnect so consumers can reload stale data
 - One-way server→client is sufficient
 - Reduces frontend complexity
 
-**2. Optimistic Updates**
+**2. RefreshKey Live-Update Pattern**
+- Dashboard widgets accept a `refreshKey` prop (counter)
+- SSE handler on the dashboard page maps event types to per-domain counters (actionItems, budget, feeds, cron)
+- When an SSE event arrives, the relevant counter increments, which triggers `useAPI` to re-fetch
+- No polling or manual refresh needed — agents creating action items via REST → SSE broadcast → widget auto-updates
+
+**3. Optimistic Updates**
 - Local state updates on SSE events
 - No polling required
 - Immediate UI feedback
 
-**3. Custom Hooks**
-- `useSSE` - Manages EventSource lifecycle
-- `useAPI` - Handles fetch with loading/error states
+**4. Custom Hooks**
+- `useSSE` - Manages EventSource lifecycle and reconnection detection
+- `useAPI` - Handles fetch with loading/error states; re-fetches when deps (including refreshKey) change
 
 **4. Component Composition**
 - Small, focused components

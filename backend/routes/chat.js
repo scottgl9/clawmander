@@ -248,14 +248,21 @@ module.exports = function (chatGatewayClient, chatService) {
       try {
         const result = await chatGatewayClient.getHistory(sessionKey, 300);
         const messages = normalizeGatewayHistory(result, sessionKey);
-        return res.json({ messages, source: 'gateway' });
+
+        // Check if there's an active run for this session
+        let activeRunId = null;
+        const agents = chatGatewayClient.getAgentStatuses();
+        const activeAgent = agents.find((a) => a.isWorking && a.sessionKey === sessionKey);
+        if (activeAgent) activeRunId = activeAgent.runId || null;
+
+        return res.json({ messages, source: 'gateway', activeRunId });
       } catch (err) {
         console.warn('[Chat] Gateway history failed, using local:', err.message);
       }
     }
 
     const messages = chatService.getHistory(sessionKey);
-    res.json({ messages, source: 'local' });
+    res.json({ messages, source: 'local', activeRunId: null });
   });
 
   // POST /api/chat/approval/resolve

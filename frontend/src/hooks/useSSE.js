@@ -5,6 +5,7 @@ export function useSSE(onEvent) {
   const [connected, setConnected] = useState(false);
   const esRef = useRef(null);
   const onEventRef = useRef(onEvent);
+  const wasConnectedRef = useRef(false);
   onEventRef.current = onEvent;
 
   const connect = useCallback(() => {
@@ -13,7 +14,14 @@ export function useSSE(onEvent) {
     const es = new EventSource(`${API_URL}/api/sse/subscribe`);
     esRef.current = es;
 
-    es.onopen = () => setConnected(true);
+    es.onopen = () => {
+      setConnected(true);
+      if (wasConnectedRef.current) {
+        // SSE reconnected after a drop — notify listeners so they can reload stale data
+        onEventRef.current({ type: 'sse.reconnected', data: {} });
+      }
+      wasConnectedRef.current = true;
+    };
     es.onerror = () => {
       setConnected(false);
       es.close();
@@ -28,6 +36,9 @@ export function useSSE(onEvent) {
       'chat.approval', 'chat.subagent',
       'agent.status', 'agent.status.snapshot',
       'feed.new', 'cron.status',
+      'actionitem.created', 'actionitem.updated', 'actionitem.deleted',
+      'budget.transaction_created', 'budget.transaction_updated', 'budget.transaction_deleted',
+      'budget.category_created', 'budget.category_updated', 'budget.category_deleted',
     ];
     events.forEach((evt) => {
       es.addEventListener(evt, (e) => {
