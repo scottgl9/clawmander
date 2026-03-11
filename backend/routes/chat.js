@@ -17,9 +17,9 @@ const EXEC_ONLY_RE = /^System: \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?
 
 function stripExecSuffix(text) {
   if (!text || typeof text !== 'string') return text;
-  // Filter whole-content notifications
+  // Filter whole-content notifications (entire message is a system event)
   if (EXEC_ONLY_RE.test(text.trimStart())) return '';
-  // Strip appended notification from end of real user message
+  // Strip notification appended to end of real user message
   return text.replace(EXEC_SUFFIX_RE, '').trimEnd();
 }
 
@@ -226,7 +226,7 @@ module.exports = function (chatGatewayClient, chatService) {
 
     if (chatGatewayClient.connected) {
       try {
-        const result = await chatGatewayClient.getHistory(sessionKey, 100);
+        const result = await chatGatewayClient.getHistory(sessionKey, 300);
         const messages = normalizeGatewayHistory(result, sessionKey);
         return res.json({ messages, source: 'gateway' });
       } catch (err) {
