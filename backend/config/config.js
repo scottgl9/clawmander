@@ -15,4 +15,10 @@ module.exports = {
   chatterbox: {
     url: process.env.CHATTERBOX_URL || 'http://localhost:8400',
   },
+  jwt: {
+    secret: process.env.JWT_SECRET || 'dev-jwt-secret-change-in-production',
+    refreshSecret: process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret-change-in-production',
+    expiry: process.env.JWT_EXPIRY || '15m',
+    refreshExpiry: process.env.JWT_REFRESH_EXPIRY || '7d',
+  },
 };
