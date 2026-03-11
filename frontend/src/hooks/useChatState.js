@@ -24,8 +24,12 @@ export function useChatState() {
   const [error, setError] = useState(null);
 
   const streamingRef = useRef({ runId: null, content: '' });
+  const activeSessionRef = useRef(null);
   // Stable ref to loadHistory so handleSSEEvent ([] deps) can call it without stale closures
   const loadHistoryRef = useRef(null);
+
+  // Keep activeSessionRef in sync to avoid stale closures in SSE handler
+  useEffect(() => { activeSessionRef.current = activeSession; }, [activeSession]);
 
   // Load sessions + models
   const loadSessions = useCallback(async () => {
@@ -56,8 +60,21 @@ export function useChatState() {
     if (!sessionKey) return;
     setLoadingHistory(true);
     try {
-      const { messages: msgs } = await chatApi.getHistory(sessionKey);
-      setMessages((prev) => ({ ...prev, [sessionKey]: msgs || [] }));
+      const { messages: msgs, activeRunId } = await chatApi.getHistory(sessionKey);
+      const history = msgs || [];
+
+      // If the backend reports an active run, restore streaming state so the UI shows dots
+      if (activeRunId) {
+        const lastAssistant = [...history].reverse().find((m) => m.role === 'assistant');
+        if (lastAssistant) {
+          lastAssistant.state = 'streaming';
+          lastAssistant.runId = activeRunId;
+        }
+        setStreamingRunId(activeRunId);
+        streamingRef.current = { runId: activeRunId, content: lastAssistant?.content || '' };
+      }
+
+      setMessages((prev) => ({ ...prev, [sessionKey]: history }));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -216,6 +233,13 @@ export function useChatState() {
           if (event.data.state === 'done' || event.data.state === 'error') return filtered;
           return [...filtered, event.data];
         });
+        break;
+      case 'sse.reconnected':
+        // SSE dropped and reconnected — reload history to catch any missed events
+        if (activeSessionRef.current) {
+          loadHistoryRef.current?.(activeSessionRef.current);
+        }
+        setSending(false);
         break;
       default:
         break;
