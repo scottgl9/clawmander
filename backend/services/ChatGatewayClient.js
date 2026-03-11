@@ -464,9 +464,12 @@ class ChatGatewayClient {
 
   _extractText(message) {
     if (!message) return '';
-    // Plain strings are tool outputs / raw content, not assistant streaming text — skip them.
-    // Legitimate streaming deltas always arrive as { content: [...] } objects.
-    if (typeof message === 'string') return '';
+    // If message is a plain string, treat it as the text content (with exec-notification
+    // filtering applied). Some gateway implementations send delta/final text as a bare string.
+    if (typeof message === 'string') {
+      if (EXEC_ONLY_RE.test(message.trimStart())) return '';
+      return message.replace(EXEC_SUFFIX_RE, '').trimEnd();
+    }
 
     let text = '';
     if (Array.isArray(message.content)) {

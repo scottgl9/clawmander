@@ -24,6 +24,8 @@ export function useChatState() {
   const [error, setError] = useState(null);
 
   const streamingRef = useRef({ runId: null, content: '' });
+  // Stable ref to loadHistory so handleSSEEvent ([] deps) can call it without stale closures
+  const loadHistoryRef = useRef(null);
 
   // Load sessions + models
   const loadSessions = useCallback(async () => {
@@ -62,6 +64,8 @@ export function useChatState() {
       setLoadingHistory(false);
     }
   }, []);
+  // Keep ref in sync so handleSSEEvent ([] deps) can call loadHistory without stale closure
+  loadHistoryRef.current = loadHistory;
 
   // Switch session
   const switchSession = useCallback((sessionKey) => {
@@ -119,10 +123,12 @@ export function useChatState() {
         setStreamingRunId(null);
         setStreamingContent('');
 
+        let messageFound = false;
         setMessages((prev) => {
           const sessionMsgs = prev[sessionKey] || [];
           const idx = sessionMsgs.findIndex((m) => m.runId === runId && m.role === 'assistant');
           if (idx !== -1) {
+            messageFound = true;
             const updated = [...sessionMsgs];
             updated[idx] = { ...updated[idx], content: text || updated[idx].content, state: 'complete' };
             return { ...prev, [sessionKey]: updated };
@@ -131,6 +137,7 @@ export function useChatState() {
           // Happens on fast responses where chat.final arrives before the
           // optimistic placeholder gets its runId, or after navigation.
           if (!text) return prev;
+          messageFound = true;
           const newMsg = {
             id: `final-${runId}`,
             sessionKey,
@@ -143,6 +150,11 @@ export function useChatState() {
           };
           return { ...prev, [sessionKey]: [...sessionMsgs, newMsg] };
         });
+        // Fallback: if the message couldn't be placed (text extraction failed upstream),
+        // reload history for this session so the response is fetched from the gateway.
+        if (!messageFound) {
+          loadHistoryRef.current?.(sessionKey);
+        }
         setSending(false);
         break;
       }
