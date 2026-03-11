@@ -3,8 +3,8 @@ import { useAPI } from '../../hooks/useAPI';
 import { api } from '../../lib/api';
 import FeedCard from './FeedCard';
 
-export default function RecentFeeds({ limit = 5 }) {
-  const { data, loading, error } = useAPI(() => api.feeds.getAll({ limit }));
+export default function RecentFeeds({ limit = 5, refreshKey }) {
+  const { data, loading, error } = useAPI(() => api.feeds.getAll({ limit }), [limit, refreshKey]);
 
   return (
     <div className="bg-surface rounded-lg border border-gray-800 p-4">

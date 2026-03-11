@@ -13,9 +13,9 @@ const FETCHERS = {
   work: () => api.work.getWorkItems(),
 };
 
-export default function ActionItemsList({ category }) {
+export default function ActionItemsList({ category, refreshKey }) {
   const fetcher = FETCHERS[category] || (() => api.work.getActionItems());
-  const { data, loading, error } = useAPI(fetcher);
+  const { data, loading, error } = useAPI(fetcher, [category, refreshKey]);
   const [expandedId, setExpandedId] = useState(null);
   const [showAll, setShowAll] = useState(false);
 

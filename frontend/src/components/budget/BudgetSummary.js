@@ -4,8 +4,8 @@ import { api } from '../../lib/api';
 import ProgressBar from '../shared/ProgressBar';
 import BudgetDetailModal from './BudgetDetailModal';
 
-export default function BudgetSummary() {
-  const { data, loading, error } = useAPI(() => api.budget.getSummary());
+export default function BudgetSummary({ refreshKey }) {
+  const { data, loading, error } = useAPI(() => api.budget.getSummary(), [refreshKey]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [expanded, setExpanded] = useState(false);
 
