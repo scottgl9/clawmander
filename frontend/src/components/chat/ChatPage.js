@@ -9,6 +9,11 @@ import ApprovalBanner from './ApprovalBanner';
 import SubagentBadge from './SubagentBadge';
 import AgentPresenceBar from './AgentPresenceBar';
 
+const FILTER_OPTIONS = [
+  { key: 'direct', label: 'Direct' },
+  { key: 'all', label: 'All' },
+];
+
 function getSessionKey(s) {
   return s.key || s.sessionKey || '';
 }
@@ -21,12 +26,10 @@ function filterSessions(sessions, filter) {
   if (filter === 'all') {
     return sessions.filter((s) => !getSessionKey(s).includes(':cron:'));
   }
-  // direct: only agent:<agentId>:clawmander:<number> sessions (created via clawmander UI)
   return sessions.filter((s) => {
     const key = getSessionKey(s);
     if (!key.startsWith('agent:')) return false;
-    const match = key.match(/^agent:[^:]+:clawmander:(\d+)$/);
-    return match !== null;
+    return /^agent:[^:]+:clawmander:(\d+)$/.test(key);
   });
 }
 
@@ -34,29 +37,16 @@ export default function ChatPage({ onConnectionChange }) {
   const [filter, setFilter] = useState('direct');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [dropdownRect, setDropdownRect] = useState(null);
+  const triggerRef = useRef(null);
   const dropdownRef = useRef(null);
 
   const {
-    sessions,
-    models,
-    activeSession,
-    messages,
-    streamingContent,
-    streamingRunId,
-    approvalPending,
-    setApprovalPending,
-    subagentActivity,
-    connected,
-    sending,
-    loadingHistory,
-    error,
-    setError,
-    loadSessions,
-    switchSession,
-    switchModel,
-    createSession,
-    sendMessage,
-    handleSSEEvent,
+    sessions, models, activeSession, messages,
+    approvalPending, setApprovalPending, subagentActivity,
+    connected, sending, loadingHistory, error, setError,
+    loadSessions, switchSession, switchModel, createSession,
+    sendMessage, handleSSEEvent,
   } = useChatState();
 
   const filteredSessions = useMemo(() => filterSessions(sessions, filter), [sessions, filter]);
@@ -65,22 +55,20 @@ export default function ChatPage({ onConnectionChange }) {
   useEffect(() => {
     if (filteredSessions.length === 0) return;
     const activeInFiltered = filteredSessions.some((s) => getSessionKey(s) === activeSession);
-    if (!activeInFiltered) {
-      switchSession(getSessionKey(filteredSessions[0]));
-    }
+    if (!activeInFiltered) switchSession(getSessionKey(filteredSessions[0]));
   }, [filteredSessions]);
 
-  // Connect SSE
   const sseConnected = useSSE(handleSSEEvent);
-
-  // Relay connection state to parent (Layout)
   if (onConnectionChange) onConnectionChange(sseConnected);
 
-  // Close dropdown on outside click
+  // Close dropdown on outside click/touch
   useEffect(() => {
     if (!dropdownOpen) return;
     const handler = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+      if (
+        dropdownRef.current && !dropdownRef.current.contains(e.target) &&
+        triggerRef.current && !triggerRef.current.contains(e.target)
+      ) {
         setDropdownOpen(false);
       }
     };
@@ -99,137 +87,69 @@ export default function ChatPage({ onConnectionChange }) {
   }, [switchSession]);
 
   const handleAction = useCallback((action, payload) => {
-    switch (action) {
-      case 'switchModel':
-        switchModel(payload);
-        break;
-      default:
-        break;
-    }
+    if (action === 'switchModel') switchModel(payload);
   }, [switchModel]);
 
   const handleAbort = useCallback(async () => {
     if (!activeSession) return;
-    try {
-      await chatApi.abort(activeSession);
-    } catch (err) {
-      setError(err.message);
-    }
+    try { await chatApi.abort(activeSession); }
+    catch (err) { setError(err.message); }
   }, [activeSession, setError]);
 
-  const currentMessages = activeSession ? (messages[activeSession] || []) : [];
+  const openDropdown = useCallback(() => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) setDropdownRect(rect);
+    setDropdownOpen((o) => !o);
+  }, []);
 
+  const currentMessages = activeSession ? (messages[activeSession] || []) : [];
   const activeSessionObj = sessions.find((s) => getSessionKey(s) === activeSession);
   const activeSessionLabel = activeSessionObj ? getSessionLabel(activeSessionObj) : 'Chat';
-
-  const sidebar = (
-    <SessionSidebar
-      sessions={sessions}
-      filteredSessions={filteredSessions}
-      filter={filter}
-      onFilterChange={setFilter}
-      activeSession={activeSession}
-      connected={connected}
-      onSelect={handleSelectSession}
-      onReload={loadSessions}
-      onNewSession={createSession}
-      models={models}
-    />
-  );
-
-  const FILTER_OPTIONS = [
-    { key: 'direct', label: 'Direct' },
-    { key: 'all', label: 'All' },
-  ];
 
   return (
     <div className="flex h-full overflow-hidden">
       {/* Session sidebar — full screen on mobile when open, fixed column on desktop */}
       <div className={`${mobileSidebarOpen ? 'flex' : 'hidden'} md:flex w-full md:w-auto flex-shrink-0`}>
-        {sidebar}
+        <SessionSidebar
+          sessions={sessions}
+          filteredSessions={filteredSessions}
+          filter={filter}
+          onFilterChange={setFilter}
+          activeSession={activeSession}
+          connected={connected}
+          onSelect={handleSelectSession}
+          onReload={loadSessions}
+          onNewSession={createSession}
+          models={models}
+        />
       </div>
 
-      {/* Main chat area — full screen on mobile when sidebar is closed */}
+      {/* Main chat area */}
       <div className={`${!mobileSidebarOpen ? 'flex' : 'hidden'} md:flex flex-col flex-1 min-w-0 overflow-hidden`}>
 
-        {/* Mobile header: session dropdown */}
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-800 md:hidden bg-gray-900">
-          {/* Session dropdown trigger */}
-          <div ref={dropdownRef} className="flex-1 relative min-w-0">
-            <button
-              onClick={() => setDropdownOpen((o) => !o)}
-              className="w-full flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 active:bg-gray-600 border border-gray-700 rounded-lg transition-colors"
+        {/* Mobile header: session dropdown trigger */}
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-800 md:hidden bg-gray-900 flex-shrink-0">
+          <button
+            ref={triggerRef}
+            onClick={openDropdown}
+            className="flex-1 flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 active:bg-gray-600 border border-gray-700 rounded-lg transition-colors min-w-0"
+          >
+            <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+            <span className="flex-1 text-sm font-medium text-gray-200 truncate text-left">{activeSessionLabel}</span>
+            <svg
+              width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
+              className={`flex-shrink-0 text-gray-500 transition-transform duration-150 ${dropdownOpen ? 'rotate-180' : ''}`}
             >
-              <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
-              <span className="flex-1 text-sm font-medium text-gray-200 truncate text-left">{activeSessionLabel}</span>
-              <svg
-                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
-                className={`flex-shrink-0 text-gray-500 transition-transform duration-150 ${dropdownOpen ? 'rotate-180' : ''}`}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-              </svg>
-            </button>
-
-            {/* Dropdown menu */}
-            {dropdownOpen && (
-              <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-gray-900 border border-gray-700 rounded-xl shadow-xl overflow-hidden">
-                {/* Filter tabs */}
-                <div className="flex border-b border-gray-800">
-                  {FILTER_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.key}
-                      onClick={() => setFilter(opt.key)}
-                      className={`flex-1 py-2 text-xs font-medium transition-colors ${
-                        filter === opt.key
-                          ? 'text-white bg-gray-700'
-                          : 'text-gray-500 hover:text-gray-300'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Session list */}
-                <div className="max-h-60 overflow-y-auto">
-                  {filteredSessions.length === 0 ? (
-                    <div className="px-4 py-4 text-center text-sm text-gray-600">No sessions</div>
-                  ) : (
-                    filteredSessions.map((s) => {
-                      const key = getSessionKey(s);
-                      const label = getSessionLabel(s);
-                      const isActive = key === activeSession;
-                      return (
-                        <button
-                          key={key}
-                          onClick={() => handleSelectSession(key)}
-                          className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-                            isActive
-                              ? 'bg-blue-900/40 text-white'
-                              : 'text-gray-400 hover:bg-gray-800 active:bg-gray-700 hover:text-gray-200'
-                          }`}
-                        >
-                          <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
-                          <span className="text-sm flex-1 truncate">{label}</span>
-                          {isActive && (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="text-blue-400 flex-shrink-0">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                            </svg>
-                          )}
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Connection indicator */}
-          <span className={`flex-shrink-0 w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-gray-600'}`} title={connected ? 'Connected' : 'Offline'} />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+            </svg>
+          </button>
+          <span
+            className={`flex-shrink-0 w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-gray-600'}`}
+            title={connected ? 'Connected' : 'Offline'}
+          />
         </div>
 
-        {/* Presence bar */}
+        {/* Presence bar (desktop only) */}
         <AgentPresenceBar sessions={filteredSessions} activeSession={activeSession} />
 
         {connected && sessions.length > 0 && filteredSessions.length === 0 ? (
@@ -244,10 +164,7 @@ export default function ChatPage({ onConnectionChange }) {
           <>
             <MessageList messages={currentMessages} loading={loadingHistory} />
             <SubagentBadge activity={subagentActivity} />
-            <ApprovalBanner
-              approval={approvalPending}
-              onResolved={() => setApprovalPending(null)}
-            />
+            <ApprovalBanner approval={approvalPending} onResolved={() => setApprovalPending(null)} />
             {error && (
               <div className="mx-4 mb-2 px-3 py-2 bg-red-900/30 border border-red-700/50 rounded text-sm text-red-300 flex items-center justify-between">
                 <span>{error}</span>
@@ -266,7 +183,65 @@ export default function ChatPage({ onConnectionChange }) {
         )}
       </div>
 
+      {/* Session dropdown — fixed position so it escapes all overflow:hidden ancestors */}
+      {dropdownOpen && dropdownRect && (
+        <div
+          ref={dropdownRef}
+          className="md:hidden fixed z-50 bg-gray-900 border border-gray-700 rounded-xl shadow-xl overflow-hidden"
+          style={{
+            top: dropdownRect.bottom + 4,
+            left: dropdownRect.left,
+            width: dropdownRect.width,
+          }}
+        >
+          {/* Filter tabs */}
+          <div className="flex border-b border-gray-800">
+            {FILTER_OPTIONS.map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => setFilter(opt.key)}
+                className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                  filter === opt.key ? 'text-white bg-gray-700' : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
 
+          {/* Session list */}
+          <div className="max-h-60 overflow-y-auto">
+            {filteredSessions.length === 0 ? (
+              <div className="px-4 py-4 text-center text-sm text-gray-600">No sessions</div>
+            ) : (
+              filteredSessions.map((s) => {
+                const key = getSessionKey(s);
+                const label = getSessionLabel(s);
+                const isActive = key === activeSession;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => handleSelectSession(key)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                      isActive
+                        ? 'bg-blue-900/40 text-white'
+                        : 'text-gray-400 hover:bg-gray-800 active:bg-gray-700 hover:text-gray-200'
+                    }`}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                    <span className="text-sm flex-1 truncate">{label}</span>
+                    {isActive && (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="text-blue-400 flex-shrink-0">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
