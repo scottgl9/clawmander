@@ -43,10 +43,11 @@ function extractGatewayText(msg) {
   if (typeof content === 'string') {
     // Skip raw JSON tool output
     if (looksLikeRawJSON(content)) return '';
-    // Skip OpenClaw runtime system notifications (exec completions, etc.)
+    // Skip messages that are entirely a system notification
     if (isOpenClawSystemNotification(content)) return '';
-    // Strip EXTERNAL_UNTRUSTED_CONTENT wrapper tags
-    return stripUntrustedWrappers(content);
+    // Strip any system notification appended to the end of a real message
+    const stripped = stripAppendedSystemNotifications(content);
+    return stripUntrustedWrappers(stripped);
   }
 
   // Array of content blocks
@@ -54,9 +55,13 @@ function extractGatewayText(msg) {
     const parts = [];
     for (const block of content) {
       if (block.type === 'text' && block.text) {
-        const cleaned = stripUntrustedWrappers(block.text);
+        // Skip blocks that are entirely a system notification
+        if (isOpenClawSystemNotification(block.text)) continue;
+        const cleaned = stripUntrustedWrappers(
+          stripAppendedSystemNotifications(block.text)
+        );
         // Skip blocks that are purely raw JSON tool output
-        if (!looksLikeRawJSON(cleaned)) {
+        if (!looksLikeRawJSON(cleaned) && cleaned.trim()) {
           parts.push(cleaned);
         }
       } else if (block.type === 'tool_use') {
@@ -84,11 +89,22 @@ function extractGatewayText(msg) {
 //   [2026-03-10 22:32:14 CDT] Exec completed (good-rid, code 0) :: ...
 //   [2026-03-10 22:32:14 CDT] Exec started (session-id) :: ...
 //   System: [2026-03-10 22:32:14 CDT] Exec completed ...
+// Matches a system notification line anywhere in a string (multiline)
 const OPENCLAW_SYSTEM_NOTIFICATION_RE = /^(?:System:\s*)?\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)/;
+// Matches from the notification onward (to strip it + everything after from a user message)
+const OPENCLAW_NOTIFICATION_SUFFIX_RE = /\n?(?:System:\s*)?\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)[\s\S]*/;
 
 function isOpenClawSystemNotification(text) {
   if (!text || typeof text !== 'string') return false;
   return OPENCLAW_SYSTEM_NOTIFICATION_RE.test(text.trimStart());
+}
+
+// Strip any appended system notification from the end of a user message.
+// The gateway sometimes injects exec-completion events into the outgoing
+// user turn (appended after the real message text).
+function stripAppendedSystemNotifications(text) {
+  if (!text || typeof text !== 'string') return text;
+  return text.replace(OPENCLAW_NOTIFICATION_SUFFIX_RE, '').trimEnd();
 }
 
 // Detect raw JSON blobs (tool output like web search results)
