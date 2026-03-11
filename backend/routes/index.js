@@ -14,15 +14,20 @@ const feedsRoutes = require('./feeds');
 const memoryRoutes = require('./memory');
 const drawingsRoutes = require('./drawings');
 const voiceRoutes = require('./voice');
+const authRoutes = require('./auth');
 
 module.exports = function mountRoutes(app, services) {
-  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService, cronService, memoryService, drawingService, config } = services;
+  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService, cronService, memoryService, drawingService, config, authDB } = services;
+
+  // Auth routes (no auth required — handles its own)
+  app.use('/api/auth', authRoutes(authDB, config));
 
   app.use('/api/agents', agentsRoutes(agentService, heartbeatService));
 
   // POST /api/agents/tasks -> create task (kept under /api/agents for OpenClaw compatibility)
   const { requireAuth } = require('../middleware/auth');
-  app.post('/api/agents/tasks', requireAuth, (req, res) => {
+  const anyAuth = require('../middleware/anyAuth');
+  app.post('/api/agents/tasks', anyAuth, (req, res) => {
     const { agentId, task } = req.body;
     const taskData = { ...task, agentId: agentId || task?.agentId };
     const result = taskService.upsert(taskData);
