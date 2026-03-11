@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, memo } from 'react';
 import dynamic from 'next/dynamic';
 import { useSSE } from '../../hooks/useSSE';
 import { useAPI } from '../../hooks/useAPI';
@@ -7,6 +7,20 @@ import DrawingSidebar from './DrawingSidebar';
 
 const ExcalidrawWrapper = dynamic(() => import('./ExcalidrawWrapper'), { ssr: false });
 
+// Memoised canvas section — only re-renders when activeDrawingId or activeDrawing change,
+// not on sidebar refreshes or saving-state toggles.
+const CanvasSection = memo(function CanvasSection({ activeDrawingId, activeDrawing, onChange, excalidrawAPIRef }) {
+  if (!activeDrawing) return null;
+  return (
+    <ExcalidrawWrapper
+      key={activeDrawingId}
+      initialData={activeDrawing.data}
+      onChange={onChange}
+      excalidrawAPIRef={excalidrawAPIRef}
+    />
+  );
+});
+
 export default function DrawPage({ onConnectionChange }) {
   const [activeDrawingId, setActiveDrawingId] = useState(null);
   const [activeDrawing, setActiveDrawing] = useState(null);
@@ -14,10 +28,14 @@ export default function DrawPage({ onConnectionChange }) {
   const [saving, setSaving] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const saveTimerRef = useRef(null);
+  const savingRef = useRef(false);
   const excalidrawAPIRef = useRef(null);
 
   const connected = useSSE(useCallback((event) => {
     if (event.type.startsWith('drawing.')) {
+      // Ignore SSE events triggered by our own auto-save to avoid
+      // re-fetching the sidebar list while actively editing.
+      if (savingRef.current) return;
       setRefreshKey((k) => k + 1);
     }
   }, []));
@@ -26,7 +44,8 @@ export default function DrawPage({ onConnectionChange }) {
 
   const { data: drawings, loading: listLoading } = useAPI(() => api.drawings.getAll(), [refreshKey]);
 
-  // Load full drawing when selection changes
+  // Load full drawing only when selection changes (not on refreshKey — that's for the sidebar list).
+  // Re-fetching the active drawing on every SSE event causes Excalidraw UI to jerk.
   useEffect(() => {
     if (!activeDrawingId) {
       setActiveDrawing(null);
@@ -39,13 +58,14 @@ export default function DrawPage({ onConnectionChange }) {
       if (!cancelled) setActiveDrawing(null);
     });
     return () => { cancelled = true; };
-  }, [activeDrawingId, refreshKey]);
+  }, [activeDrawingId]);
 
   const handleChange = useCallback((elements, appState, files) => {
     if (!activeDrawingId) return;
     clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(async () => {
       setSaving(true);
+      savingRef.current = true;
       try {
         // Only send serializable appState keys
         const { collaborators, ...cleanState } = appState;
@@ -53,6 +73,8 @@ export default function DrawPage({ onConnectionChange }) {
           data: { elements, appState: cleanState, files },
         });
       } catch {} finally {
+        // Brief grace period so the SSE echo from our own save is suppressed
+        setTimeout(() => { savingRef.current = false; }, 500);
         setSaving(false);
       }
     }, 1000);
@@ -115,13 +137,13 @@ export default function DrawPage({ onConnectionChange }) {
         {activeDrawing ? (
           <div className="flex-1 relative">
             {saving && (
-              <div className="absolute top-2 right-2 z-10 text-xs text-gray-500 bg-surface/80 px-2 py-1 rounded hidden md:block">
+              <div className="absolute top-2 right-2 z-10 text-xs text-gray-500 bg-surface/80 px-2 py-1 rounded hidden md:block pointer-events-none">
                 Saving...
               </div>
             )}
-            <ExcalidrawWrapper
-              key={activeDrawingId}
-              initialData={activeDrawing.data}
+            <CanvasSection
+              activeDrawingId={activeDrawingId}
+              activeDrawing={activeDrawing}
               onChange={handleChange}
               excalidrawAPIRef={excalidrawAPIRef}
             />

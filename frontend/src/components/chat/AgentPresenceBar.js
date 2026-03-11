@@ -1,3 +1,9 @@
+function formatSessionKey(key) {
+  if (!key) return null;
+  const m = key.match(/^agent:(.+?):clawmander:(.+)$/);
+  return m ? `${m[1]}:${m[2]}` : null;
+}
+
 export default function AgentPresenceBar({ sessions, activeSession }) {
   if (!sessions || sessions.length === 0) return null;
 
@@ -6,7 +12,7 @@ export default function AgentPresenceBar({ sessions, activeSession }) {
       <span className="text-xs text-gray-600 flex-shrink-0">Sessions:</span>
       {sessions.slice(0, 8).map((s) => {
         const key = s.key || s.sessionKey;
-        const label = s.displayName || s.agentId || key;
+        const label = s.displayName || formatSessionKey(key) || s.agentId || key;
         const isActive = key === activeSession;
         return (
           <div

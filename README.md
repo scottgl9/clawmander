@@ -12,7 +12,21 @@ A real-time dashboard that aggregates data from OpenClaw, workspace files, finan
 
 ## Features
 
-### 💬 Chat Interface (NEW)
+### 🎤 Voice Integration
+- **Mic button** on chat input — click to dictate (Web Speech API, hidden in unsupported browsers)
+- **TTS toggle** on chat page — agent responses read aloud via Chatterbox TTS server
+- **Per-message speaker button** — replay any assistant message
+- **Dedicated `/voice` page** — hands-free conversation loop with mic FAB, auto-listen mode, session selector
+- Backend TTS proxy (`POST /api/voice/tts`) to Chatterbox OpenAI-compatible endpoint; CORS-free
+- Configurable Chatterbox URL + Excalidraw asset path via **Server Settings** page
+
+### 🎨 Drawing Canvas
+- Full Excalidraw canvas at `/draw` with dark theme
+- Drawing list sidebar — create, rename, delete drawings
+- Auto-save with 1s debounce; real-time sync via SSE (`drawing.*` events)
+- Agent-accessible via REST API (`POST /api/drawings`, `PATCH /api/drawings/:id`)
+
+### 💬 Chat Interface
 - Discord/Matrix-style chat with OpenClaw agents
 - Session sidebar with all active agent sessions
 - Streaming responses with real-time markdown rendering (GFM tables, code blocks)
@@ -68,17 +82,19 @@ A real-time dashboard that aggregates data from OpenClaw, workspace files, finan
 clawmander/
 ├── backend/                    # Node.js/Express REST API
 │   ├── server.js               # Main server
-│   ├── routes/                 # API endpoints (incl. /api/chat/*)
+│   ├── routes/                 # API endpoints (chat, drawings, voice, ...)
 │   ├── collectors/             # OpenClawCollector (read-only WS)
 │   ├── services/               # ChatGatewayClient, ChatService, etc.
 │   └── models/                 # Data models
 ├── frontend/                   # React/Next.js dashboard
 │   ├── components/
 │   │   ├── chat/               # Chat UI components
+│   │   ├── drawings/           # Excalidraw canvas + sidebar
+│   │   ├── voice/              # Voice page + settings panel
 │   │   ├── kanban/             # Kanban board
 │   │   └── layout/             # Sidebar, Header, Layout
-│   ├── hooks/                  # useSSE, useChatState
-│   ├── pages/                  # chat.js, agents.js, etc.
+│   ├── hooks/                  # useSSE, useChatState, useSpeechRecognition, ...
+│   ├── pages/                  # chat.js, draw.js, voice.js, agents.js, etc.
 │   └── lib/                    # api.js, chatApi.js
 └── docs/                       # Documentation (GATEWAY.md, API.md, ...)
 ```
@@ -147,6 +163,8 @@ cd frontend && npm run dev     # Terminal 2 - Frontend on :3000
 ## Key Features
 
 - ✅ **Chat Interface** - Discord-style chat with agent sessions, markdown, slash commands
+- ✅ **Voice Integration** - STT mic input, TTS playback, hands-free /voice page
+- ✅ **Drawing Canvas** - Excalidraw canvas with auto-save and agent-accessible REST API
 - ✅ **Real-time Kanban Board** - Live task updates via SSE
 - ✅ **Heartbeat Monitoring** - Countdown timers with color-coded alerts
 - ✅ **Agent Status Tracking** - Visual indicators for agent health
@@ -212,8 +230,11 @@ See [Setup Guide](docs/SETUP.md) for details.
 - `GET /api/chat/sessions` - Gateway sessions
 - `GET /api/chat/models` - Available models
 - `GET /api/chat/history/:sessionKey` - Local message history
+- `GET /api/drawings` - List drawings
+- `GET /api/drawings/:id` - Get drawing
+- `GET /api/voice/tts/status` - Chatterbox server availability
 
-**Write Endpoints** (no auth required for chat, Bearer token for tasks):
+**Write Endpoints** (no auth required for chat/voice, Bearer token for tasks/drawings):
 - `POST /api/chat/send` - Send message to agent `{sessionKey, message}`
 - `POST /api/chat/abort` - Abort active run `{sessionKey}`
 - `POST /api/chat/sessions/:key/reset` - Reset session
@@ -223,14 +244,19 @@ See [Setup Guide](docs/SETUP.md) for details.
 - `POST /api/agents/tasks` - Create task
 - `PATCH /api/tasks/:id` - Update task
 - `POST /api/agents/heartbeat` - Report heartbeat
+- `POST /api/drawings` - Create drawing
+- `PATCH /api/drawings/:id` - Update drawing
+- `DELETE /api/drawings/:id` - Delete drawing
+- `POST /api/voice/tts` - Synthesize speech `{text, voice?, chatterboxUrl?}`
 
-**SSE Stream** (includes chat events):
+**SSE Stream** (includes chat and drawing events):
 - `GET /api/sse/subscribe` - Real-time event stream
   - `chat.delta` - Streaming response chunk
   - `chat.final` - Response complete
   - `chat.error` - Response error
   - `chat.aborted` - Response aborted
   - `chat.approval` - Approval request pending
+  - `drawing.created` / `drawing.updated` / `drawing.deleted` - Drawing changes
 
 Full API documentation: [docs/API.md](docs/API.md)
 
