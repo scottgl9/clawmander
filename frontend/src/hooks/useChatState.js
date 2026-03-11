@@ -86,7 +86,6 @@ export function useChatState() {
         const { sessionKey, runId, text } = event.data;
         if (!text) break;
 
-        // Each delta payload carries the cumulative text so far — replace, don't append
         streamingRef.current = { runId, content: text };
         setStreamingRunId(runId);
         setStreamingContent(text);
@@ -95,14 +94,23 @@ export function useChatState() {
           const sessionMsgs = prev[sessionKey] || [];
           const idx = sessionMsgs.findIndex((m) => m.runId === runId && m.role === 'assistant');
           if (idx !== -1) {
+            // Accumulate delta text — gateway sends incremental chunks, not cumulative text
             const updated = [...sessionMsgs];
-            updated[idx] = { ...updated[idx], content: text, state: 'streaming' };
+            updated[idx] = { ...updated[idx], content: (updated[idx].content || '') + text, state: 'streaming' };
             return { ...prev, [sessionKey]: updated };
           }
-          // Message not found — create it.
-          // Happens when: (a) user navigated away and back mid-stream so the
-          // optimistic placeholder was replaced by a history reload, or
-          // (b) delta arrived before chatApi.send() resolved with the runId.
+          // Claim a runId-less streaming placeholder if present (the optimistic placeholder
+          // added by sendMessage). The gateway's runId differs from our idempotencyKey, so
+          // the placeholder never had a matching runId — claim it on first delta.
+          const placeholderIdx = sessionMsgs.findIndex(
+            (m) => !m.runId && m.role === 'assistant' && m.state === 'streaming'
+          );
+          if (placeholderIdx !== -1) {
+            const updated = [...sessionMsgs];
+            updated[placeholderIdx] = { ...updated[placeholderIdx], runId, content: text, state: 'streaming' };
+            return { ...prev, [sessionKey]: updated };
+          }
+          // No placeholder found — create a new streaming message (e.g. navigated back mid-stream)
           const newMsg = {
             id: `stream-${runId}`,
             sessionKey,
@@ -123,38 +131,42 @@ export function useChatState() {
         setStreamingRunId(null);
         setStreamingContent('');
 
-        let messageFound = false;
         setMessages((prev) => {
           const sessionMsgs = prev[sessionKey] || [];
           const idx = sessionMsgs.findIndex((m) => m.runId === runId && m.role === 'assistant');
           if (idx !== -1) {
-            messageFound = true;
             const updated = [...sessionMsgs];
             updated[idx] = { ...updated[idx], content: text || updated[idx].content, state: 'complete' };
             return { ...prev, [sessionKey]: updated };
           }
-          // Message not found — create it as complete.
-          // Happens on fast responses where chat.final arrives before the
-          // optimistic placeholder gets its runId, or after navigation.
-          if (!text) return prev;
-          messageFound = true;
-          const newMsg = {
-            id: `final-${runId}`,
-            sessionKey,
-            role: 'assistant',
-            content: text,
-            runId,
-            state: 'complete',
-            attachments: [],
-            timestamp: new Date().toISOString(),
-          };
-          return { ...prev, [sessionKey]: [...sessionMsgs, newMsg] };
+          // Try to claim a runId-less streaming placeholder (fast response where final
+          // arrives before any delta had a chance to claim it).
+          const placeholderIdx = sessionMsgs.findIndex(
+            (m) => !m.runId && m.role === 'assistant' && m.state === 'streaming'
+          );
+          if (placeholderIdx !== -1 && text) {
+            const updated = [...sessionMsgs];
+            updated[placeholderIdx] = { ...updated[placeholderIdx], runId, content: text, state: 'complete' };
+            return { ...prev, [sessionKey]: updated };
+          }
+          // Create a new complete message if we have text.
+          if (text) {
+            const newMsg = {
+              id: `final-${runId}`,
+              sessionKey,
+              role: 'assistant',
+              content: text,
+              runId,
+              state: 'complete',
+              attachments: [],
+              timestamp: new Date().toISOString(),
+            };
+            return { ...prev, [sessionKey]: [...sessionMsgs, newMsg] };
+          }
+          // No text and no matching message — reload history as a safety net.
+          setTimeout(() => loadHistoryRef.current?.(sessionKey), 0);
+          return prev;
         });
-        // Fallback: if the message couldn't be placed (text extraction failed upstream),
-        // reload history for this session so the response is fetched from the gateway.
-        if (!messageFound) {
-          loadHistoryRef.current?.(sessionKey);
-        }
         setSending(false);
         break;
       }
@@ -248,15 +260,7 @@ export function useChatState() {
     }));
 
     try {
-      const { runId } = await chatApi.send(activeSession, text, attachments);
-      // Update the temp assistant message with the real runId
-      setMessages((prev) => {
-        const sessionMsgs = prev[activeSession] || [];
-        const updated = sessionMsgs.map((m) =>
-          m.id === tempAsstMsg.id ? { ...m, runId } : m
-        );
-        return { ...prev, [activeSession]: updated };
-      });
+      await chatApi.send(activeSession, text, attachments);
     } catch (err) {
       setSending(false);
       setError(err.message);

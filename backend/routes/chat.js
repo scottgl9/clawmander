@@ -197,7 +197,27 @@ module.exports = function (chatGatewayClient, chatService) {
       return res.status(400).json({ error: 'sessionKey and message are required' });
     }
     try {
-      const result = await chatService.send(sessionKey, message, attachments || []);
+      // Transform file-upload attachments: read from disk and base64-encode so the
+      // gateway receives self-contained image data rather than a local URL it can't fetch.
+      const fs = require('fs');
+      const MEDIA_TYPES = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' };
+      const uploadDir = path.join(__dirname, '../storage/data/uploads');
+
+      const resolvedAttachments = await Promise.all((attachments || []).map(async (att) => {
+        const match = att.url && att.url.match(/^\/api\/chat\/uploads\/([^/]+)$/);
+        if (!match) return att;
+        const filename = match[1];
+        const ext = (att.originalname || '').split('.').pop().toLowerCase();
+        const mediaType = MEDIA_TYPES[ext] || 'application/octet-stream';
+        try {
+          const data = fs.readFileSync(path.join(uploadDir, filename)).toString('base64');
+          return { ...att, type: 'image', mediaType, data };
+        } catch {
+          return att;
+        }
+      }));
+
+      const result = await chatService.send(sessionKey, message, resolvedAttachments);
       res.json({ ok: true, ...result });
     } catch (err) {
       console.error('[Chat] send error:', err.message);
