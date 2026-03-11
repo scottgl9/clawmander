@@ -7,6 +7,11 @@ const WebSocket = require('ws');
 const config = require('../config/config');
 const { identity: deviceIdentity, buildAuthPayloadV3, sign: signPayload, publicKeyRawBase64Url } = require('./DeviceIdentity');
 
+// Strip exec completion notifications appended to user message content.
+// Requires preceding whitespace so user-typed "System: ..." at the start is not stripped.
+const EXEC_SUFFIX_RE = /\s+System: \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)[\s\S]*/;
+const EXEC_ONLY_RE = /^System: \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)/;
+
 
 
 class ChatGatewayClient {
@@ -391,8 +396,9 @@ class ChatGatewayClient {
     // Only surface assistant messages to the UI. toolResult/toolUse/system
     // messages (e.g. exec completion notifications) must be filtered here
     // just as they are filtered in normalizeGatewayHistory.
+    // user-role messages pass through but have exec suffixes stripped below.
     const msgRole = payload.message?.role;
-    if (msgRole && msgRole !== 'assistant') {
+    if (msgRole && msgRole !== 'assistant' && msgRole !== 'user') {
       // Still track agent lifecycle but don't broadcast text to the UI
       if (state === 'final' || state === 'end') {
         if (agentId) this._activeRuns.delete(agentId);
@@ -472,6 +478,12 @@ class ChatGatewayClient {
       text = message.content;
     } else if (message.text) {
       text = message.text;
+    }
+
+    // Strip exec notifications appended to user message content
+    if (text && message.role === 'user') {
+      if (EXEC_ONLY_RE.test(text.trimStart())) return '';
+      text = text.replace(EXEC_SUFFIX_RE, '').trimEnd();
     }
 
     return text;

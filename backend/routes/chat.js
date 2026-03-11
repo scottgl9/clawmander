@@ -5,14 +5,31 @@ const { v4: uuidv4 } = require('uuid');
 
 const SYSTEM_USERNAME = os.userInfo().username;
 
+// Exec completion notifications are injected by the gateway in two ways:
+//   1. As standalone role:"toolResult" toolName:"exec" messages → caught by role filter
+//   2. Appended onto user message content (same role:"user") → caught by stripExecSuffix
+//
+// Pattern: mandatory whitespace before "System:" so we don't strip user-typed
+// text that merely starts with "System:" (no preceding text to strip from).
+const EXEC_SUFFIX_RE = /\s+System: \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)[\s\S]*/;
+// Whole-content check — entire message is just a notification (no real user text)
+const EXEC_ONLY_RE = /^System: \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)/;
+
+function stripExecSuffix(text) {
+  if (!text || typeof text !== 'string') return text;
+  // Filter whole-content notifications
+  if (EXEC_ONLY_RE.test(text.trimStart())) return '';
+  // Strip appended notification from end of real user message
+  return text.replace(EXEC_SUFFIX_RE, '').trimEnd();
+}
+
 // Normalize OpenClaw gateway chat.history response into Clawmander message format
 function normalizeGatewayHistory(result, sessionKey) {
   const raw = Array.isArray(result) ? result : (result?.messages || result?.items || result?.turns || []);
   return raw
     // Only show user and assistant turns.
     // toolResult / system / tool roles are internal — never shown in the chat UI.
-    // Notably, exec completion notifications arrive as role:"toolResult" toolName:"exec"
-    // and are filtered here without any text parsing.
+    // Notably, standalone exec notifications arrive as role:"toolResult" toolName:"exec".
     .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
     // For user turns, skip if content is entirely tool_result blocks (file reads, tool outputs)
     .filter((msg) => {
@@ -42,10 +59,13 @@ function extractGatewayText(msg) {
 
   const content = msg.content;
 
+  const isUser = msg.role === 'user';
+
   // String content
   if (typeof content === 'string') {
     if (looksLikeRawJSON(content)) return '';
-    return stripUntrustedWrappers(content);
+    const text = stripUntrustedWrappers(content);
+    return isUser ? stripExecSuffix(text) : text;
   }
 
   // Array of content blocks
@@ -55,14 +75,14 @@ function extractGatewayText(msg) {
       if (block.type === 'text' && block.text) {
         const cleaned = stripUntrustedWrappers(block.text);
         if (!looksLikeRawJSON(cleaned) && cleaned.trim()) {
-          parts.push(cleaned);
+          parts.push(isUser ? stripExecSuffix(cleaned) : cleaned);
         }
       } else if (block.type === 'tool_use') {
         parts.push(`*Used tool: ${block.name || 'unknown'}*`);
       }
       // Skip tool_result blocks — raw tool output
     }
-    return parts.join('\n');
+    return parts.filter(Boolean).join('\n');
   }
 
   // Object content (single tool result or unexpected shape) — skip
