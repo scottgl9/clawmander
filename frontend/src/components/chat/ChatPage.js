@@ -32,7 +32,7 @@ function filterSessions(sessions, filter) {
 
 export default function ChatPage({ onConnectionChange }) {
   const [filter, setFilter] = useState('direct');
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(true);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
