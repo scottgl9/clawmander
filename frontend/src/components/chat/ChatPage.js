@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useSSE } from '../../hooks/useSSE';
 import { useChatState } from '../../hooks/useChatState';
 import { chatApi } from '../../lib/chatApi';
@@ -33,7 +33,8 @@ function filterSessions(sessions, filter) {
 export default function ChatPage({ onConnectionChange }) {
   const [filter, setFilter] = useState('direct');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(true);
-  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   const {
     sessions,
@@ -75,10 +76,26 @@ export default function ChatPage({ onConnectionChange }) {
   // Relay connection state to parent (Layout)
   if (onConnectionChange) onConnectionChange(sseConnected);
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [dropdownOpen]);
+
   const handleSelectSession = useCallback((key) => {
     switchSession(key);
     setMobileSidebarOpen(false);
-    setMobileSheetOpen(false);
+    setDropdownOpen(false);
   }, [switchSession]);
 
   const handleAction = useCallback((action, payload) => {
@@ -135,29 +152,78 @@ export default function ChatPage({ onConnectionChange }) {
       {/* Main chat area — full screen on mobile when sidebar is closed */}
       <div className={`${!mobileSidebarOpen ? 'flex' : 'hidden'} md:flex flex-col flex-1 min-w-0 overflow-hidden`}>
 
-        {/* Mobile header: session name (tappable) + filter toggle */}
+        {/* Mobile header: session dropdown */}
         <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-800 md:hidden bg-gray-900">
-          {/* Back to full sidebar */}
-          <button
-            onClick={() => setMobileSidebarOpen(true)}
-            className="flex-shrink-0 p-1 text-gray-500 hover:text-white transition-colors"
-            title="All sessions"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-            </svg>
-          </button>
+          {/* Session dropdown trigger */}
+          <div ref={dropdownRef} className="flex-1 relative min-w-0">
+            <button
+              onClick={() => setDropdownOpen((o) => !o)}
+              className="w-full flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 active:bg-gray-600 border border-gray-700 rounded-lg transition-colors"
+            >
+              <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+              <span className="flex-1 text-sm font-medium text-gray-200 truncate text-left">{activeSessionLabel}</span>
+              <svg
+                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
+                className={`flex-shrink-0 text-gray-500 transition-transform duration-150 ${dropdownOpen ? 'rotate-180' : ''}`}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
 
-          {/* Tappable session name — opens bottom sheet picker */}
-          <button
-            onClick={() => setMobileSheetOpen(true)}
-            className="flex-1 flex items-center gap-1.5 min-w-0 text-left"
-          >
-            <span className="text-sm font-medium text-gray-200 truncate">{activeSessionLabel}</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="flex-shrink-0 text-gray-500">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-            </svg>
-          </button>
+            {/* Dropdown menu */}
+            {dropdownOpen && (
+              <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-gray-900 border border-gray-700 rounded-xl shadow-xl overflow-hidden">
+                {/* Filter tabs */}
+                <div className="flex border-b border-gray-800">
+                  {FILTER_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.key}
+                      onClick={() => setFilter(opt.key)}
+                      className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                        filter === opt.key
+                          ? 'text-white bg-gray-700'
+                          : 'text-gray-500 hover:text-gray-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Session list */}
+                <div className="max-h-60 overflow-y-auto">
+                  {filteredSessions.length === 0 ? (
+                    <div className="px-4 py-4 text-center text-sm text-gray-600">No sessions</div>
+                  ) : (
+                    filteredSessions.map((s) => {
+                      const key = getSessionKey(s);
+                      const label = getSessionLabel(s);
+                      const isActive = key === activeSession;
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => handleSelectSession(key)}
+                          className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                            isActive
+                              ? 'bg-blue-900/40 text-white'
+                              : 'text-gray-400 hover:bg-gray-800 active:bg-gray-700 hover:text-gray-200'
+                          }`}
+                        >
+                          <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                          <span className="text-sm flex-1 truncate">{label}</span>
+                          {isActive && (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="text-blue-400 flex-shrink-0">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                            </svg>
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Connection indicator */}
           <span className={`flex-shrink-0 w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-gray-600'}`} title={connected ? 'Connected' : 'Offline'} />
@@ -200,85 +266,7 @@ export default function ChatPage({ onConnectionChange }) {
         )}
       </div>
 
-      {/* Mobile bottom-sheet session picker */}
-      {mobileSheetOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex flex-col justify-end">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/60"
-            onClick={() => setMobileSheetOpen(false)}
-          />
 
-          {/* Sheet */}
-          <div className="relative bg-gray-900 rounded-t-2xl border-t border-gray-700 max-h-[70vh] flex flex-col">
-            {/* Handle */}
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-10 h-1 rounded-full bg-gray-600" />
-            </div>
-
-            {/* Sheet header */}
-            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800">
-              <span className="text-sm font-semibold text-gray-300">Switch Session</span>
-              <div className="flex items-center gap-3">
-                {/* Filter toggle */}
-                <div className="flex text-[10px] bg-gray-800 rounded-md overflow-hidden">
-                  {FILTER_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.key}
-                      onClick={() => setFilter(opt.key)}
-                      className={`px-2.5 py-1 transition-colors ${
-                        filter === opt.key ? 'bg-gray-600 text-gray-100' : 'text-gray-500 hover:text-gray-300'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  onClick={() => setMobileSheetOpen(false)}
-                  className="text-gray-500 hover:text-white transition-colors p-1"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Session list */}
-            <div className="overflow-y-auto flex-1 py-2">
-              {filteredSessions.length === 0 ? (
-                <div className="px-4 py-6 text-center text-sm text-gray-600">No sessions</div>
-              ) : (
-                filteredSessions.map((s) => {
-                  const key = getSessionKey(s);
-                  const label = getSessionLabel(s);
-                  const isActive = key === activeSession;
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => handleSelectSession(key)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 transition-colors ${
-                        isActive
-                          ? 'bg-blue-900/40 text-white'
-                          : 'text-gray-400 hover:bg-gray-800 active:bg-gray-700 hover:text-gray-200'
-                      }`}
-                    >
-                      <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
-                      <span className="text-sm text-left flex-1 truncate">{label}</span>
-                      {isActive && (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="text-blue-400 flex-shrink-0">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                        </svg>
-                      )}
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
