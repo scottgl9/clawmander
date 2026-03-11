@@ -388,6 +388,19 @@ class ChatGatewayClient {
     // but chat events are guaranteed to fire during streaming.
     const agentId = this._extractAgentId(sessionKey);
 
+    // Only surface assistant messages to the UI. toolResult/toolUse/system
+    // messages (e.g. exec completion notifications) must be filtered here
+    // just as they are filtered in normalizeGatewayHistory.
+    const msgRole = payload.message?.role;
+    if (msgRole && msgRole !== 'assistant') {
+      // Still track agent lifecycle but don't broadcast text to the UI
+      if (state === 'final' || state === 'end') {
+        if (agentId) this._activeRuns.delete(agentId);
+        this._completeTask(sessionKey, runId, 'done');
+      }
+      return;
+    }
+
     switch (state) {
       case 'delta': {
         const text = this._extractText(payload.message);
