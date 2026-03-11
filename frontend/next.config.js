@@ -1,8 +1,15 @@
+const defaultCache = require('next-pwa/cache');
+
 const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
+  customWorkerDir: 'worker',
+  runtimeCaching: [
+    // SSE removed — bypassed via custom worker entry (worker/index.js)
+    ...defaultCache,
+  ],
 });
 
 /** @type {import('next').NextConfig} */
