@@ -46,12 +46,13 @@ export default function SlashCommandMenu({ input, onSelect, onAction, visible, m
                 key={m.id}
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  // Directly switch model — no need to type and press enter
-                  if (onAction) onAction('switchModel', m.id);
+                  // Send full provider/model ID — gateway requires the provider prefix
+                  const fullId = m.provider ? `${m.provider}/${m.id}` : m.id;
+                  if (onAction) onAction('switchModel', fullId);
                 }}
                 className="w-full flex items-center justify-between px-3 py-1.5 text-sm hover:bg-gray-700 transition-colors text-left"
               >
-                <span className="text-white text-xs">{m.id}</span>
+                <span className="text-white text-xs">{m.provider ? `${m.provider}/${m.id}` : m.id}</span>
                 {m.name && m.name !== m.id && (
                   <span className="text-gray-500 text-[11px] ml-3 truncate max-w-[180px]">{m.name}</span>
                 )}
