@@ -65,7 +65,7 @@ export default function Header({ connected, onMenuToggle }) {
   };
 
   return (
-    <header className="flex items-center justify-between px-3 md:px-6 py-3 bg-surface border-b border-gray-800">
+    <header className="sticky top-0 z-30 flex items-center justify-between px-3 md:px-6 py-3 bg-surface border-b border-gray-800 flex-shrink-0">
       <div className="flex items-center gap-3">
         <button
           onClick={onMenuToggle}
