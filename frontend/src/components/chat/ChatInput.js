@@ -1,7 +1,8 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import SlashCommandMenu from './SlashCommandMenu';
 import { chatApi } from '../../lib/chatApi';
 import { API_URL } from '../../lib/constants';
+import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 
 export default function ChatInput({ onSend, onAbort, onAction, sending, disabled, models = [] }) {
   const [input, setInput] = useState('');
@@ -10,6 +11,15 @@ export default function ChatInput({ onSend, onAbort, onAction, sending, disabled
   const [showSlash, setShowSlash] = useState(false);
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  const { state: micState, transcript, start: micStart, stop: micStop, isSupported: micSupported } = useSpeechRecognition();
+
+  // Update input as speech transcript changes
+  useEffect(() => {
+    if (transcript) {
+      setInput(transcript);
+    }
+  }, [transcript]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -134,6 +144,24 @@ export default function ChatInput({ onSend, onAbort, onAction, sending, disabled
           className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-100 placeholder-gray-600 resize-none focus:outline-none focus:border-blue-600 transition-colors disabled:opacity-50"
           style={{ minHeight: 40, maxHeight: 160 }}
         />
+
+        {/* Mic button */}
+        {micSupported && (
+          <button
+            onClick={micState === 'listening' ? micStop : micStart}
+            disabled={disabled && !sending}
+            className={`flex-shrink-0 p-2 transition-colors ${
+              micState === 'listening'
+                ? 'text-red-500 animate-pulse'
+                : 'text-gray-500 hover:text-gray-300'
+            } disabled:opacity-40`}
+            title={micState === 'listening' ? 'Stop listening' : 'Voice input'}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+            </svg>
+          </button>
+        )}
 
         {/* Send / Abort button */}
         {sending ? (

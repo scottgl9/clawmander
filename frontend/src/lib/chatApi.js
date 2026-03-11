@@ -1,8 +1,14 @@
 import { API_URL } from './constants';
 
+const AUTH_TOKEN = process.env.NEXT_PUBLIC_AUTH_TOKEN || '';
+
 async function fetchJSON(path, options = {}) {
   const res = await fetch(`${API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(AUTH_TOKEN ? { Authorization: `Bearer ${AUTH_TOKEN}` } : {}),
+      ...options.headers,
+    },
     ...options,
   });
   if (!res.ok) {
@@ -51,8 +57,26 @@ export const chatApi = {
   uploadImage: async (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch(`${API_URL}/api/chat/upload`, { method: 'POST', body: formData });
+    const res = await fetch(`${API_URL}/api/chat/upload`, {
+      method: 'POST',
+      body: formData,
+      headers: AUTH_TOKEN ? { Authorization: `Bearer ${AUTH_TOKEN}` } : {},
+    });
     if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
     return res.json();
   },
+};
+
+export const voiceApi = {
+  speak: async (text, voice = 'default', signal, chatterboxUrl) => {
+    const res = await fetch(`${API_URL}/api/voice/tts`, {
+      method: 'POST',
+      signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, voice, ...(chatterboxUrl ? { chatterboxUrl } : {}) }),
+    });
+    if (!res.ok) throw new Error(`TTS error: ${res.status}`);
+    return res.blob();
+  },
+  checkStatus: () => fetchJSON('/api/voice/tts/status'),
 };
