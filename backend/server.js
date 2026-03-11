@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const compression = require('compression');
 const config = require('./config/config');
 const SSEManager = require('./services/SSEManager');
 const AgentService = require('./services/AgentService');
@@ -21,6 +22,13 @@ const { activityLogger } = require('./middleware/logger');
 const app = express();
 
 // Middleware
+app.use(compression({
+  filter: (req, res) => {
+    // Don't compress SSE streams
+    if (req.path.includes('/sse/')) return false;
+    return compression.filter(req, res);
+  },
+}));
 app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
