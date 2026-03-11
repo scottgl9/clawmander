@@ -92,8 +92,9 @@ function extractGatewayText(msg) {
 //   System: [2026-03-10 22:32:14 CDT] Exec completed ...
 // Matches a system notification line anywhere in a string (multiline)
 const OPENCLAW_SYSTEM_NOTIFICATION_RE = /^(?:System:\s*)?\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)/;
-// Matches from the notification onward (to strip it + everything after from a user message)
-const OPENCLAW_NOTIFICATION_SUFFIX_RE = /\n?(?:System:\s*)?\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)[\s\S]*/;
+// Strips a system notification appended on a new line at the end of a user message.
+// Requires a literal newline + "System:" prefix so inline user-quoted occurrences are NOT stripped.
+const OPENCLAW_NOTIFICATION_SUFFIX_RE = /\nSystem: \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)[\s\S]*/;
 
 function isOpenClawSystemNotification(text) {
   if (!text || typeof text !== 'string') return false;
