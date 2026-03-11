@@ -55,6 +55,9 @@ export function useChatState() {
   // Switch session
   const switchSession = useCallback((sessionKey) => {
     setActiveSession(sessionKey);
+    // Don't clear streaming state — the SSE handlers will continue updating
+    // whichever session the event belongs to via sessionKey matching.
+    // Only reset the visual streaming indicator (it's per-session in the UI).
     setStreamingContent('');
     setStreamingRunId(null);
     streamingRef.current = { runId: null, content: '' };
@@ -71,18 +74,31 @@ export function useChatState() {
         // Each delta payload carries the cumulative text so far — replace, don't append
         streamingRef.current = { runId, content: text };
         setStreamingRunId(runId);
-        setStreamingContent(streamingRef.current.content);
+        setStreamingContent(text);
 
-        // Update message in history if it exists
         setMessages((prev) => {
           const sessionMsgs = prev[sessionKey] || [];
           const idx = sessionMsgs.findIndex((m) => m.runId === runId && m.role === 'assistant');
           if (idx !== -1) {
             const updated = [...sessionMsgs];
-            updated[idx] = { ...updated[idx], content: streamingRef.current.content, state: 'streaming' };
+            updated[idx] = { ...updated[idx], content: text, state: 'streaming' };
             return { ...prev, [sessionKey]: updated };
           }
-          return prev;
+          // Message not found — create it.
+          // Happens when: (a) user navigated away and back mid-stream so the
+          // optimistic placeholder was replaced by a history reload, or
+          // (b) delta arrived before chatApi.send() resolved with the runId.
+          const newMsg = {
+            id: `stream-${runId}`,
+            sessionKey,
+            role: 'assistant',
+            content: text,
+            runId,
+            state: 'streaming',
+            attachments: [],
+            timestamp: new Date().toISOString(),
+          };
+          return { ...prev, [sessionKey]: [...sessionMsgs, newMsg] };
         });
         break;
       }
@@ -100,7 +116,21 @@ export function useChatState() {
             updated[idx] = { ...updated[idx], content: text || updated[idx].content, state: 'complete' };
             return { ...prev, [sessionKey]: updated };
           }
-          return prev;
+          // Message not found — create it as complete.
+          // Happens on fast responses where chat.final arrives before the
+          // optimistic placeholder gets its runId, or after navigation.
+          if (!text) return prev;
+          const newMsg = {
+            id: `final-${runId}`,
+            sessionKey,
+            role: 'assistant',
+            content: text,
+            runId,
+            state: 'complete',
+            attachments: [],
+            timestamp: new Date().toISOString(),
+          };
+          return { ...prev, [sessionKey]: [...sessionMsgs, newMsg] };
         });
         setSending(false);
         break;
