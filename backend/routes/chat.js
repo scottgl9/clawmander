@@ -9,7 +9,10 @@ const SYSTEM_USERNAME = os.userInfo().username;
 function normalizeGatewayHistory(result, sessionKey) {
   const raw = Array.isArray(result) ? result : (result?.messages || result?.items || result?.turns || []);
   return raw
-    // Only show user and assistant turns — skip tool/system/tool_result roles
+    // Only show user and assistant turns.
+    // toolResult / system / tool roles are internal — never shown in the chat UI.
+    // Notably, exec completion notifications arrive as role:"toolResult" toolName:"exec"
+    // and are filtered here without any text parsing.
     .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
     // For user turns, skip if content is entirely tool_result blocks (file reads, tool outputs)
     .filter((msg) => {
@@ -37,18 +40,12 @@ function normalizeGatewayHistory(result, sessionKey) {
 function extractGatewayText(msg) {
   if (!msg) return '';
 
-
   const content = msg.content;
 
   // String content
   if (typeof content === 'string') {
-    // Skip raw JSON tool output
     if (looksLikeRawJSON(content)) return '';
-    // Skip messages that are entirely a system notification
-    if (isOpenClawSystemNotification(content)) return '';
-    // Strip any system notification appended to the end of a real message
-    const stripped = stripAppendedSystemNotifications(content);
-    return stripUntrustedWrappers(stripped);
+    return stripUntrustedWrappers(content);
   }
 
   // Array of content blocks
@@ -56,20 +53,14 @@ function extractGatewayText(msg) {
     const parts = [];
     for (const block of content) {
       if (block.type === 'text' && block.text) {
-        // Skip blocks that are entirely a system notification
-        if (isOpenClawSystemNotification(block.text)) continue;
-        const cleaned = stripUntrustedWrappers(
-          stripAppendedSystemNotifications(block.text)
-        );
-        // Skip blocks that are purely raw JSON tool output
+        const cleaned = stripUntrustedWrappers(block.text);
         if (!looksLikeRawJSON(cleaned) && cleaned.trim()) {
           parts.push(cleaned);
         }
       } else if (block.type === 'tool_use') {
-        // Show a brief indicator for tool calls
         parts.push(`*Used tool: ${block.name || 'unknown'}*`);
       }
-      // Skip tool_result blocks entirely — they contain raw tool output
+      // Skip tool_result blocks — raw tool output
     }
     return parts.join('\n');
   }
@@ -79,34 +70,6 @@ function extractGatewayText(msg) {
 
   if (msg.text) return stripUntrustedWrappers(msg.text);
   return '';
-}
-
-// Detect OpenClaw runtime system notifications injected into chat sessions.
-// These are internal plumbing messages (exec completions, heartbeats, etc.)
-// delivered by the gateway to keep agents informed — they should never be
-// surfaced in the Clawmander chat UI.
-//
-// Examples:
-//   [2026-03-10 22:32:14 CDT] Exec completed (good-rid, code 0) :: ...
-//   [2026-03-10 22:32:14 CDT] Exec started (session-id) :: ...
-//   System: [2026-03-10 22:32:14 CDT] Exec completed ...
-// Matches a system notification line anywhere in a string (multiline)
-const OPENCLAW_SYSTEM_NOTIFICATION_RE = /^(?:System:\s*)?\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)/;
-// Strips a system notification appended on a new line at the end of a user message.
-// Requires a literal newline + "System:" prefix so inline user-quoted occurrences are NOT stripped.
-const OPENCLAW_NOTIFICATION_SUFFIX_RE = /\nSystem: \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)[\s\S]*/;
-
-function isOpenClawSystemNotification(text) {
-  if (!text || typeof text !== 'string') return false;
-  return OPENCLAW_SYSTEM_NOTIFICATION_RE.test(text.trimStart());
-}
-
-// Strip any appended system notification from the end of a user message.
-// The gateway sometimes injects exec-completion events into the outgoing
-// user turn (appended after the real message text).
-function stripAppendedSystemNotifications(text) {
-  if (!text || typeof text !== 'string') return text;
-  return text.replace(OPENCLAW_NOTIFICATION_SUFFIX_RE, '').trimEnd();
 }
 
 // Detect raw JSON blobs (tool output like web search results)
