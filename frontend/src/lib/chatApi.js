@@ -1,16 +1,64 @@
 import { API_URL } from './constants';
 
-const AUTH_TOKEN = process.env.NEXT_PUBLIC_AUTH_TOKEN || '';
+function getAuthHeaders() {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function tryRefreshToken() {
+  const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+  if (!refreshToken) return null;
+  try {
+    const res = await fetch(`${API_URL}/api/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (!res.ok) return null;
+    const { accessToken } = await res.json();
+    localStorage.setItem('accessToken', accessToken);
+    return accessToken;
+  } catch {
+    return null;
+  }
+}
 
 async function fetchJSON(path, options = {}) {
   const res = await fetch(`${API_URL}${path}`, {
     headers: {
       'Content-Type': 'application/json',
-      ...(AUTH_TOKEN ? { Authorization: `Bearer ${AUTH_TOKEN}` } : {}),
+      ...getAuthHeaders(),
       ...options.headers,
     },
     ...options,
   });
+
+  if (res.status === 401) {
+    const newToken = await tryRefreshToken();
+    if (newToken) {
+      const retryRes = await fetch(`${API_URL}${path}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${newToken}`,
+          ...options.headers,
+        },
+        ...options,
+      });
+      if (!retryRes.ok) {
+        let msg = `API error: ${retryRes.status}`;
+        try { const body = await retryRes.json(); msg = body.error || msg; } catch {}
+        throw new Error(msg);
+      }
+      return retryRes.json();
+    }
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      window.location.href = '/login';
+    }
+    throw new Error('Session expired');
+  }
+
   if (!res.ok) {
     let msg = `API error: ${res.status}`;
     try { const body = await res.json(); msg = body.error || msg; } catch {}
@@ -60,7 +108,7 @@ export const chatApi = {
     const res = await fetch(`${API_URL}/api/chat/upload`, {
       method: 'POST',
       body: formData,
-      headers: AUTH_TOKEN ? { Authorization: `Bearer ${AUTH_TOKEN}` } : {},
+      headers: getAuthHeaders(),
     });
     if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
     return res.json();
