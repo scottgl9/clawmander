@@ -37,6 +37,7 @@ function normalizeGatewayHistory(result, sessionKey) {
 function extractGatewayText(msg) {
   if (!msg) return '';
 
+
   const content = msg.content;
 
   // String content
