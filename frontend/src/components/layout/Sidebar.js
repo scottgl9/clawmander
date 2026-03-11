@@ -157,7 +157,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }) {
       {/* Sidebar */}
       <aside
         className={`
-          ${collapsed ? 'w-16' : 'w-52'}
+          ${collapsed ? 'w-[4.5rem]' : 'w-56'}
           bg-surface-light border-r border-gray-800 flex flex-col py-4
           ${enableTransition ? 'transition-all duration-200' : ''}
           flex-shrink-0 overflow-hidden
@@ -169,7 +169,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }) {
           {NAV_ITEMS.map(({ href, label, icon }) => {
             const active = href === '/' ? router.pathname === '/' : router.pathname.startsWith(href);
             return (
-              <Link key={href} href={href} className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium cursor-pointer transition-colors whitespace-nowrap ${
+              <Link key={href} href={href} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium cursor-pointer transition-colors whitespace-nowrap ${
                   active
                     ? 'bg-accent text-white'
                     : 'text-gray-500 hover:text-white hover:bg-surface-lighter'
@@ -177,7 +177,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }) {
                 title={collapsed && !mobileOpen ? label : undefined}
                 onClick={handleNavClick}
               >
-                <span className="flex-shrink-0" style={{ width: 20, height: 20 }}>{icon}</span>
+                <span className="flex-shrink-0" style={{ width: 22, height: 22 }}>{icon}</span>
                 {((!collapsed && mounted) || mobileOpen) && (
                   <span className="truncate">{label}</span>
                 )}
