@@ -12,9 +12,10 @@ const personaSyncRoutes = require('./personasync');
 const cronRoutes = require('./cron');
 const feedsRoutes = require('./feeds');
 const memoryRoutes = require('./memory');
+const drawingsRoutes = require('./drawings');
 
 module.exports = function mountRoutes(app, services) {
-  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService, cronService, memoryService } = services;
+  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService, cronService, memoryService, drawingService } = services;
 
   app.use('/api/agents', agentsRoutes(agentService, heartbeatService));
 
@@ -40,4 +41,5 @@ module.exports = function mountRoutes(app, services) {
   app.use('/api/cron', cronRoutes(cronService));
   app.use('/api/feeds', feedsRoutes(cronService));
   app.use('/api/memory', memoryRoutes(memoryService));
+  app.use('/api/drawings', drawingsRoutes(drawingService));
 };

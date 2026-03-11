@@ -206,15 +206,25 @@ export default function Dashboard() {
 
 **Create page** (`frontend/src/pages/newpage.js`):
 ```javascript
+import { useState, useCallback } from 'react';
 import Layout from '../components/layout/Layout';
 import { useSSE } from '../hooks/useSSE';
 
 export default function NewPage() {
-  const connected = useSSE(() => {});
+  // Use refreshKey pattern for live-updating widgets
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const connected = useSSE(useCallback((event) => {
+    if (event.type.startsWith('myfeature.')) {
+      setRefreshKey((k) => k + 1);
+    }
+  }, []));
 
   return (
     <Layout connected={connected}>
       <h1 className="text-2xl font-bold">New Page</h1>
+      {/* Pass refreshKey to widgets that should live-update */}
+      <MyWidget refreshKey={refreshKey} />
     </Layout>
   );
 }

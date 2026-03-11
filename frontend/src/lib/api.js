@@ -58,6 +58,13 @@ export const api = {
   server: {
     getStatus: () => fetchJSON('/api/server/status'),
   },
+  drawings: {
+    getAll: () => fetchJSON('/api/drawings'),
+    getById: (id) => fetchJSON(`/api/drawings/${id}`),
+    create: (data) => fetchJSON('/api/drawings', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id, data) => fetchJSON(`/api/drawings/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: (id) => fetchJSON(`/api/drawings/${id}`, { method: 'DELETE' }),
+  },
   activity: {
     getLog: (params = {}) => {
       const qs = new URLSearchParams(params).toString();
