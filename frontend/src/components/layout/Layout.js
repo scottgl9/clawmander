@@ -42,7 +42,7 @@ export default function Layout({ children, connected, noPadding = false }) {
 
   return (
     <div
-      className="h-screen flex flex-col"
+      className="h-screen flex flex-col" style={{ height: '100dvh' }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
