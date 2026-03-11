@@ -4,7 +4,14 @@ import { chatApi } from '../lib/chatApi';
 export function useChatState() {
   const [sessions, setSessions] = useState([]);
   const [models, setModels] = useState([]);
-  const [activeSession, setActiveSession] = useState(null);
+  const [activeSession, setActiveSessionState] = useState(null);
+
+  const setActiveSession = useCallback((key) => {
+    setActiveSessionState(key);
+    if (key) {
+      try { localStorage.setItem('clawmander-active-session', key); } catch {}
+    }
+  }, []);
   // messages: Map<sessionKey, Message[]>
   const [messages, setMessages] = useState({});
   const [streamingContent, setStreamingContent] = useState(''); // accumulated delta text
@@ -25,7 +32,11 @@ export function useChatState() {
       setSessions(list || []);
       setConnected(isConnected || false);
       if (!activeSession && list && list.length > 0) {
-        setActiveSession(list[0].key || list[0].sessionKey);
+        // Restore previously active session if it still exists, else use first
+        let savedKey = null;
+        try { savedKey = localStorage.getItem('clawmander-active-session'); } catch {}
+        const exists = savedKey && list.some((s) => (s.key || s.sessionKey) === savedKey);
+        setActiveSession(exists ? savedKey : (list[0].key || list[0].sessionKey));
       }
     } catch (err) {
       setError(err.message);
