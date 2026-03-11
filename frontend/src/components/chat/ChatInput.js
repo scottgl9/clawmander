@@ -77,7 +77,7 @@ export default function ChatInput({ onSend, onAbort, onAction, sending, disabled
   const canSend = input.trim() && !sending && !disabled;
 
   return (
-    <div className="border-t border-gray-800 bg-gray-900 px-4 py-3">
+    <div className="border-t border-gray-800 bg-gray-900 px-4 py-3 safe-area-bottom">
       {/* Attachment previews */}
       {attachments.length > 0 && (
         <div className="flex gap-2 mb-2 flex-wrap">

@@ -19,6 +19,13 @@ body {
   color: var(--text-primary);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   margin: 0;
+  /* Prevent horizontal overflow at the body level */
+  overflow-x: hidden;
+}
+
+/* Respect iOS/Android safe area insets (notch, home indicator, etc.) */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 * {
