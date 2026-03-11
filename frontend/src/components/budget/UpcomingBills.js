@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAPI } from '../../hooks/useAPI';
 import { api } from '../../lib/api';
 
-export default function UpcomingBills() {
-  const { data, loading, error } = useAPI(() => api.budget.getUpcomingBills());
+export default function UpcomingBills({ refreshKey }) {
+  const { data, loading, error } = useAPI(() => api.budget.getUpcomingBills(), [refreshKey]);
   const [billDays, setBillDays] = useState({});
 
   useEffect(() => {

@@ -38,7 +38,9 @@ Returns `{ models: [...], connected: bool }`.
 ```
 GET /api/chat/history/:sessionKey
 ```
-Returns `{ messages: [...] }` — locally persisted messages (up to 200 per session).
+Returns `{ messages: [...], source: 'gateway'|'local', activeRunId: string|null }`.
+Fetches from gateway if connected (source of truth), falls back to local store.
+`activeRunId` is non-null when an agent has an active run for this session — used by the frontend to restore streaming state on navigation.
 
 #### Send Message
 ```
@@ -377,6 +379,19 @@ The SSE stream emits the following events:
 | `actionitem.created` | Action item object | New action item created |
 | `actionitem.updated` | Action item object | Action item updated |
 | `actionitem.deleted` | `{ id }` | Action item removed |
+| `budget.transaction_created` | Transaction object | New budget transaction |
+| `budget.transaction_updated` | Transaction object | Budget transaction updated |
+| `budget.transaction_deleted` | `{ id }` | Budget transaction removed |
+| `budget.category_created` | Category object | New budget category |
+| `budget.category_updated` | Category object | Budget category updated |
+| `budget.category_deleted` | `{ id }` | Budget category removed |
+| `chat.delta` | `{ sessionKey, runId, text }` | Streaming assistant text |
+| `chat.final` | `{ sessionKey, runId, text }` | Final assistant response |
+| `chat.error` | `{ sessionKey, runId, error }` | Chat error |
+| `chat.aborted` | `{ sessionKey, runId }` | Run was aborted |
+| `agent.status` | `{ agentId, isWorking, runId, sessionKey }` | Agent work state change |
+| `feed.new` | Feed entry object | New feed/report available |
+| `cron.status` | Cron status object | Cron job status change |
 
 ---
 
