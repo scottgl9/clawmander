@@ -1,8 +1,15 @@
 import { useState, useMemo } from 'react';
 import { chatApi } from '../../lib/chatApi';
 
+function formatSessionKey(key) {
+  if (!key) return null;
+  const m = key.match(/^agent:(.+?):clawmander:(.+)$/);
+  return m ? `${m[1]}:${m[2]}` : null;
+}
+
 function getSessionLabel(s) {
-  return s.displayName || s.agentId || s.key || s.sessionKey || 'Unknown';
+  const key = s.key || s.sessionKey;
+  return s.displayName || formatSessionKey(key) || s.agentId || key || 'Unknown';
 }
 
 function getSessionKey(s) {

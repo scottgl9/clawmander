@@ -12,4 +12,7 @@ module.exports = {
     wsUrl: process.env.OPENCLAW_WS_URL || 'ws://127.0.0.1:18789',
     token: process.env.OPENCLAW_TOKEN || '',
   },
+  chatterbox: {
+    url: process.env.CHATTERBOX_URL || 'http://localhost:8400',
+  },
 };

@@ -1,5 +1,17 @@
 import { useEffect, useRef, useCallback } from 'react';
+import '@excalidraw/excalidraw/index.css';
 import { Excalidraw } from '@excalidraw/excalidraw';
+
+// Apply stored asset path before Excalidraw initializes
+if (typeof window !== 'undefined') {
+  try {
+    const stored = localStorage.getItem('clawmander-service-settings');
+    if (stored) {
+      const { excalidrawAssetPath } = JSON.parse(stored);
+      if (excalidrawAssetPath) window.EXCALIDRAW_ASSET_PATH = excalidrawAssetPath;
+    }
+  } catch {}
+}
 
 export default function ExcalidrawWrapper({ initialData, onChange, excalidrawAPIRef }) {
   const apiRef = useRef(null);

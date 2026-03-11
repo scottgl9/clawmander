@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import ChatMessage from './ChatMessage';
 
-export default function MessageList({ messages, loading }) {
+export default function MessageList({ messages, loading, onSpeak }) {
   const bottomRef = useRef(null);
 
   // Auto-scroll to bottom when messages change
@@ -32,7 +32,7 @@ export default function MessageList({ messages, loading }) {
   return (
     <div className="flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-0">
       {messages.map((msg) => (
-        <ChatMessage key={msg.id} message={msg} />
+        <ChatMessage key={msg.id} message={msg} onSpeak={onSpeak} />
       ))}
       <div ref={bottomRef} />
     </div>

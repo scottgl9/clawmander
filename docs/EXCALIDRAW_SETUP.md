@@ -162,10 +162,18 @@ No transformation needed — `FileStore` saves/loads the full JSON.
 
 ## Implementation Checklist
 
-- [ ] Install `@excalidraw/excalidraw` in frontend
-- [ ] Create `frontend/src/pages/draw.js` with Excalidraw component
-- [ ] Create `backend/routes/drawings.js` with CRUD endpoints
-- [ ] Add `drawings/` FileStore in backend storage
-- [ ] Wire SSE events (`drawing.*`) in backend and frontend
+- [x] Install `@excalidraw/excalidraw` in frontend
+- [x] Create `frontend/src/pages/draw.js` with Excalidraw component
+- [x] Create `backend/routes/drawings.js` with CRUD endpoints
+- [x] Add `drawings/` FileStore in backend storage
+- [x] Wire SSE events (`drawing.*`) in backend and frontend
 - [ ] Update `clawmander` skill docs with drawing endpoints
 - [ ] Optional: add "Recent Drawings" dashboard widget
+
+## Implementation Notes
+
+- `@excalidraw/excalidraw` v0.18+ is pure ESM — requires `transpilePackages: ['@excalidraw/excalidraw']` in `frontend/next.config.js` for Next.js/webpack bundling
+- Excalidraw CSS (`index.css`) must be imported inside `ExcalidrawWrapper.js` (not in `_app.js`) to avoid stylesheet bleeding into other pages
+- Wrap the canvas in `React.memo` to prevent parent re-renders (sidebar list refreshes, saving-state toggles) from causing Excalidraw layout recalculation/twitching
+- Use a `savingRef` gate in the SSE handler to suppress re-fetches triggered by the page's own auto-saves
+- `EXCALIDRAW_ASSET_PATH` can be configured via **Server Settings** page — stored in localStorage key `clawmander-service-settings`

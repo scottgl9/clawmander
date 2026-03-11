@@ -14,6 +14,8 @@ The token is configured via the `AUTH_TOKEN` environment variable in the backend
 
 Read endpoints (`GET`) do not require authentication.
 
+**Frontend**: Set `NEXT_PUBLIC_AUTH_TOKEN` in `frontend/.env.local` so the dashboard's API client includes the token on all write requests.
+
 ---
 
 ## Endpoints
@@ -570,6 +572,82 @@ Response 200:
   "completedThisMonth": 12
 }
 ```
+
+---
+
+### Drawings
+
+#### List Drawings
+```
+GET /api/drawings
+
+Response 200: [{ "id": "uuid", "title": "Architecture Diagram", "updatedAt": "..." }]
+```
+
+#### Get Drawing
+```
+GET /api/drawings/:id
+
+Response 200: <full drawing object with data>
+```
+
+#### Create Drawing
+```
+POST /api/drawings
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "title": "New Drawing", "data": { "elements": [], "appState": {}, "files": {} } }
+
+Response 201: <drawing object>
+```
+
+#### Update Drawing
+```
+PATCH /api/drawings/:id
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "title": "Renamed", "data": { "elements": [...], "appState": {...}, "files": {} } }
+
+Response 200: <updated drawing object>
+```
+
+#### Delete Drawing
+```
+DELETE /api/drawings/:id
+Authorization: Bearer <token>
+
+Response 200: { "success": true }
+```
+
+**SSE events**: `drawing.created`, `drawing.updated`, `drawing.deleted`
+
+---
+
+### Voice (TTS Proxy)
+
+#### Synthesize Speech
+```
+POST /api/voice/tts
+Content-Type: application/json
+
+{ "text": "Hello world", "voice": "default", "chatterboxUrl": "http://localhost:8400" }
+```
+
+Proxies to Chatterbox `/v1/audio/speech`. Strips markdown from `text` server-side before sending. `chatterboxUrl` overrides the `CHATTERBOX_URL` env var (useful for testing).
+
+Response: audio bytes with `Content-Type: audio/mpeg` (or whatever Chatterbox returns).
+
+#### TTS Status
+```
+GET /api/voice/tts/status
+
+Response 200: { "available": true }
+Response 200: { "available": false, "error": "..." }
+```
+
+Pings the Chatterbox server. Safe to call frequently — used by the UI status indicator.
 
 ---
 
