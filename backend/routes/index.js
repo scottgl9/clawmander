@@ -13,9 +13,10 @@ const cronRoutes = require('./cron');
 const feedsRoutes = require('./feeds');
 const memoryRoutes = require('./memory');
 const drawingsRoutes = require('./drawings');
+const voiceRoutes = require('./voice');
 
 module.exports = function mountRoutes(app, services) {
-  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService, cronService, memoryService, drawingService } = services;
+  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService, cronService, memoryService, drawingService, config } = services;
 
   app.use('/api/agents', agentsRoutes(agentService, heartbeatService));
 
@@ -42,4 +43,5 @@ module.exports = function mountRoutes(app, services) {
   app.use('/api/feeds', feedsRoutes(cronService));
   app.use('/api/memory', memoryRoutes(memoryService));
   app.use('/api/drawings', drawingsRoutes(drawingService));
+  app.use('/api/voice', voiceRoutes(config));
 };

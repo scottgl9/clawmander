@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useSSE } from '../../hooks/useSSE';
 import { useChatState } from '../../hooks/useChatState';
+import { useTextToSpeech } from '../../hooks/useTextToSpeech';
+import { useVoiceSettings } from '../../hooks/useVoiceSettings';
 import { chatApi } from '../../lib/chatApi';
 import SessionSidebar from './SessionSidebar';
 import MessageList from './MessageList';
@@ -40,6 +42,10 @@ export default function ChatPage({ onConnectionChange }) {
   const [dropdownRect, setDropdownRect] = useState(null);
   const triggerRef = useRef(null);
   const dropdownRef = useRef(null);
+  const lastSpokenIdRef = useRef(null);
+
+  const { speak, stop: stopSpeaking, isSpeaking } = useTextToSpeech();
+  const { settings: voiceSettings, updateSettings: updateVoiceSettings } = useVoiceSettings();
 
   const {
     sessions, models, activeSession, messages,
@@ -113,6 +119,27 @@ export default function ChatPage({ onConnectionChange }) {
     return () => window.removeEventListener('resize', update);
   }, [dropdownOpen]);
 
+  // Auto-speak when TTS is enabled and a message completes
+  useEffect(() => {
+    if (!voiceSettings.ttsEnabled || !activeSession) return;
+    const msgs = messages[activeSession] || [];
+    const lastAssistant = [...msgs].reverse().find((m) => m.role === 'assistant' && m.state === 'complete');
+    if (lastAssistant && lastAssistant.id !== lastSpokenIdRef.current && lastAssistant.content) {
+      lastSpokenIdRef.current = lastAssistant.id;
+      speak(lastAssistant.content, voiceSettings.voiceName);
+    }
+  }, [messages, activeSession, voiceSettings.ttsEnabled]);
+
+  const handleSpeak = useCallback((content) => {
+    speak(content, voiceSettings.voiceName);
+  }, [speak, voiceSettings.voiceName]);
+
+  const toggleTts = useCallback(() => {
+    const next = !voiceSettings.ttsEnabled;
+    updateVoiceSettings({ ttsEnabled: next });
+    if (!next) stopSpeaking();
+  }, [voiceSettings.ttsEnabled, updateVoiceSettings, stopSpeaking]);
+
   const currentMessages = activeSession ? (messages[activeSession] || []) : [];
   const activeSessionObj = sessions.find((s) => getSessionKey(s) === activeSession);
   const activeSessionLabel = activeSessionObj ? getSessionLabel(activeSessionObj) : 'Chat';
@@ -154,6 +181,15 @@ export default function ChatPage({ onConnectionChange }) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
             </svg>
           </button>
+          <button
+            onClick={toggleTts}
+            className={`flex-shrink-0 p-1 rounded transition-colors ${voiceSettings.ttsEnabled ? 'text-blue-400' : 'text-gray-600 hover:text-gray-400'}`}
+            title={voiceSettings.ttsEnabled ? 'TTS on — click to mute' : 'TTS off — click to enable'}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+            </svg>
+          </button>
           <span
             className={`flex-shrink-0 w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-gray-600'}`}
             title={connected ? 'Connected' : 'Offline'}
@@ -161,7 +197,18 @@ export default function ChatPage({ onConnectionChange }) {
         </div>
 
         {/* Presence bar (desktop only) */}
-        <AgentPresenceBar sessions={filteredSessions} activeSession={activeSession} />
+        <div className="hidden md:flex items-center">
+          <div className="flex-1"><AgentPresenceBar sessions={filteredSessions} activeSession={activeSession} /></div>
+          <button
+            onClick={toggleTts}
+            className={`flex-shrink-0 mr-3 p-1.5 rounded transition-colors ${voiceSettings.ttsEnabled ? 'text-blue-400 bg-blue-900/30' : 'text-gray-600 hover:text-gray-400'}`}
+            title={voiceSettings.ttsEnabled ? 'TTS on — click to mute' : 'TTS off — click to enable'}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+            </svg>
+          </button>
+        </div>
 
         {connected && sessions.length > 0 && filteredSessions.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">
@@ -173,7 +220,7 @@ export default function ChatPage({ onConnectionChange }) {
           </div>
         ) : (
           <>
-            <MessageList messages={currentMessages} loading={loadingHistory} />
+            <MessageList messages={currentMessages} loading={loadingHistory} onSpeak={handleSpeak} />
             <SubagentBadge activity={subagentActivity} />
             <ApprovalBanner approval={approvalPending} onResolved={() => setApprovalPending(null)} />
             {error && (

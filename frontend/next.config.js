@@ -30,6 +30,7 @@ const withPWA = require('next-pwa')({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: [
+    '@excalidraw/excalidraw',
     'react-markdown',
     'remark-gfm',
     'remark-parse',

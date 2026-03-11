@@ -8,6 +8,7 @@ Complete guide to setting up Clawmander Dashboard from scratch.
 - **Git** for cloning the repository
 - **OpenClaw** running at `ws://127.0.0.1:18789` (optional, dashboard works without it)
 - **Linux** with systemd (for service deployment) or any OS for manual deployment
+- **Chatterbox** (optional) — for TTS voice responses. Install from [Resemble AI / Chatterbox](https://github.com/resemble-ai/chatterbox) and run on port 8400. Exposes an OpenAI-compatible `/v1/audio/speech` endpoint.
 
 ## Quick Start
 
@@ -53,6 +54,7 @@ OPENCLAW_TOKEN=your-openclaw-token
 cd ../frontend
 cat > .env.local << 'EOF'
 NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_AUTH_TOKEN=changeme
 EOF
 ```
 
@@ -165,12 +167,14 @@ Docker support planned. See GitHub issues.
 | `AUTH_TOKEN` | Yes | `changeme` | Bearer token for write endpoints |
 | `OPENCLAW_WS_URL` | No | `ws://127.0.0.1:18789` | OpenClaw WebSocket URL |
 | `OPENCLAW_TOKEN` | No | `''` | OpenClaw authentication token |
+| `CHATTERBOX_URL` | No | `http://localhost:8400` | Chatterbox TTS server URL |
 
 ### Frontend (`frontend/.env.local`)
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `NEXT_PUBLIC_API_URL` | No | `''` (uses Next.js proxy) | Backend API URL |
+| `NEXT_PUBLIC_AUTH_TOKEN` | Yes | `changeme` | Bearer token — must match `AUTH_TOKEN` in backend `.env` |
 
 ## Port Configuration
 
