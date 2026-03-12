@@ -143,6 +143,23 @@ class TaskService {
   cleanupDoneTasks() {
     return this.midnightCleanup();
   }
+
+  // Mark tasks stuck in_progress for more than maxAgeMs as done
+  reconcileStale(maxAgeMs = 2 * 60 * 60 * 1000) {
+    const tasks = this.store.read();
+    const cutoff = Date.now() - maxAgeMs;
+    let reconciled = 0;
+    for (const t of tasks) {
+      if (t.status === 'in_progress' && new Date(t.updatedAt).getTime() < cutoff) {
+        this.update(t.id, { status: 'done', progress: 100 });
+        reconciled++;
+      }
+    }
+    if (reconciled > 0) {
+      console.log(`[TaskService] Reconciled ${reconciled} stale in_progress task(s) → done`);
+    }
+    return reconciled;
+  }
 }
 
 module.exports = TaskService;
