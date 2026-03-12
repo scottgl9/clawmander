@@ -18,8 +18,10 @@ const CronService = require('./services/CronService');
 const MemoryService = require('./services/MemoryService');
 const DrawingService = require('./services/DrawingService');
 const TerminalService = require('./services/TerminalService');
+const BrowserManager = require('./services/BrowserManager');
 const AuthDB = require('./storage/AuthDB');
 const { attachTerminalWS } = require('./routes/terminal');
+const { attachBrowserWS } = require('./routes/browser');
 const mountRoutes = require('./routes');
 const { activityLogger } = require('./middleware/logger');
 
@@ -58,6 +60,7 @@ const cronService = new CronService(sseManager, config.openClawHome, taskService
 const memoryService = new MemoryService();
 const drawingService = new DrawingService(sseManager);
 const terminalService = new TerminalService();
+const browserManager = new BrowserManager(sseManager, config);
 
 // Wire chat events into ChatService for message history tracking
 sseManager._origBroadcast = sseManager.broadcast.bind(sseManager);
@@ -71,7 +74,7 @@ sseManager.broadcast = function (event, data) {
 };
 
 // Routes
-mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService, cronService, memoryService, drawingService, config, authDB });
+mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService, cronService, memoryService, drawingService, config, authDB, browserManager });
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -185,11 +188,20 @@ const server = app.listen(config.port, '127.0.0.1', () => {
   console.log(`[Clawmander] SSE endpoint: http://localhost:${config.port}/api/sse/subscribe`);
 });
 
+// Attach browser WebSocket (before terminal so /ws/browser/:id is matched first)
+attachBrowserWS(server, browserManager);
+
 // Attach terminal WebSocket to the HTTP server
 attachTerminalWS(server, terminalService);
 
+// Initialize browser manager (async, non-blocking)
+browserManager.init().catch((err) => {
+  console.error('[Browser] Initialization failed:', err.message);
+});
+
 // Graceful shutdown
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   terminalService.destroyAll();
+  await browserManager.destroyAll();
   server.close();
 });
