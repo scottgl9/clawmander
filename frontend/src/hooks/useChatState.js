@@ -111,9 +111,9 @@ export function useChatState() {
           const sessionMsgs = prev[sessionKey] || [];
           const idx = sessionMsgs.findIndex((m) => m.runId === runId && m.role === 'assistant');
           if (idx !== -1) {
-            // Accumulate delta text — gateway sends incremental chunks, not cumulative text
+            // Gateway sends cumulative text in each delta — replace, don't accumulate
             const updated = [...sessionMsgs];
-            updated[idx] = { ...updated[idx], content: (updated[idx].content || '') + text, state: 'streaming' };
+            updated[idx] = { ...updated[idx], content: text, state: 'streaming' };
             return { ...prev, [sessionKey]: updated };
           }
           // Claim a runId-less streaming placeholder if present (the optimistic placeholder
