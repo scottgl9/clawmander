@@ -428,9 +428,22 @@ class OpenClawCollector {
     if (!agentId) return;
 
     const tasks = this.taskService.getAll({ agentId });
-    const match = tasks.find(
-      (t) => t.sessionKey === data.sessionKey && t.runId === data.runId && t.status !== 'done'
-    );
+
+    // Try exact match first (sessionKey + runId), then fallback to broader matches
+    let match = null;
+    if (data.sessionKey && data.runId) {
+      match = tasks.find(
+        (t) => t.sessionKey === data.sessionKey && t.runId === data.runId && t.status !== 'done'
+      );
+    }
+    if (!match && data.sessionKey) {
+      match = tasks.find(
+        (t) => t.sessionKey === data.sessionKey && t.status === 'in_progress'
+      );
+    }
+    if (!match) {
+      match = tasks.find((t) => t.status === 'in_progress');
+    }
     if (match) {
       this.taskService.update(match.id, { status: 'done', progress: 100 });
     }

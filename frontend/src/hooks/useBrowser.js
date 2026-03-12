@@ -114,6 +114,9 @@ export default function useBrowser(instanceId, canvasRef) {
   }, []);
 
   const navigate = useCallback((navUrl) => sendJSON({ type: 'navigate', url: navUrl }), [sendJSON]);
+  const goBack = useCallback(() => sendJSON({ type: 'back' }), [sendJSON]);
+  const goForward = useCallback(() => sendJSON({ type: 'forward' }), [sendJSON]);
+  const reload = useCallback(() => sendJSON({ type: 'reload' }), [sendJSON]);
   const sendClick = useCallback((normX, normY) => sendJSON({ type: 'click', x: normX, y: normY }), [sendJSON]);
   const sendType = useCallback((text) => sendJSON({ type: 'type', text }), [sendJSON]);
   const sendKey = useCallback((key) => sendJSON({ type: 'key', key }), [sendJSON]);
@@ -133,6 +136,9 @@ export default function useBrowser(instanceId, canvasRef) {
     agentMessage,
     viewportSize,
     navigate,
+    goBack,
+    goForward,
+    reload,
     sendClick,
     sendType,
     sendKey,
