@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Layout from '../components/layout/Layout';
 import { useSSE } from '../hooks/useSSE';
@@ -6,34 +6,43 @@ import { API_URL } from '../lib/constants';
 
 const BrowserPanel = dynamic(() => import('../components/browser/BrowserPanel'), { ssr: false });
 
+function getAuthHeaders() {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export default function BrowserPage() {
   const [instances, setInstances] = useState([]);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
   const [connected, setConnected] = useState(true);
+  const autoCreatedRef = useRef(false);
 
   const fetchInstances = useCallback(async () => {
     try {
-      const token = localStorage.getItem('clawmander-token');
       const res = await fetch(`${API_URL}/api/browser`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: { ...getAuthHeaders() },
       });
       if (res.ok) {
         const data = await res.json();
         setInstances(data);
+        return data;
       }
     } catch {}
+    return null;
   }, []);
 
   useEffect(() => {
     fetchInstances();
   }, [fetchInstances]);
 
-  // Auto-create and select "default" instance on first visit
+  // Auto-create "default" instance on first visit (only once)
   useEffect(() => {
-    if (instances.length === 0 && !loading && !selected) {
+    if (autoCreatedRef.current || loading) return;
+    if (instances.length === 0) {
+      autoCreatedRef.current = true;
       createInstance('default');
-    } else if (instances.length > 0 && !selected) {
+    } else if (!selected) {
       setSelected(instances[0].id);
     }
   }, [instances, loading, selected]);
@@ -57,19 +66,25 @@ export default function BrowserPage() {
   const createInstance = async (id) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('clawmander-token');
       const res = await fetch(`${API_URL}/api/browser`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({ id: id || undefined }),
       });
       if (res.ok) {
         const data = await res.json();
+        // Add to instances immediately (don't rely solely on SSE)
+        setInstances((prev) => {
+          if (prev.find((i) => i.id === data.id)) return prev;
+          return [...prev, data];
+        });
         setSelected(data.id);
-        // SSE will add to instances list
+      } else if (res.status === 409) {
+        // Already exists — just select it
+        setSelected(id);
       }
     } catch {}
     setLoading(false);
@@ -77,12 +92,13 @@ export default function BrowserPage() {
 
   const destroyInstance = async (id) => {
     try {
-      const token = localStorage.getItem('clawmander-token');
       await fetch(`${API_URL}/api/browser/${id}`, {
         method: 'DELETE',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: { ...getAuthHeaders() },
       });
-      // SSE will remove from list
+      // Update locally immediately
+      setInstances((prev) => prev.filter((i) => i.id !== id));
+      setSelected((prev) => (prev === id ? null : prev));
     } catch {}
   };
 

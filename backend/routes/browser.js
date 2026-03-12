@@ -174,7 +174,7 @@ function browserRoutes(browserManager) {
 }
 
 function attachBrowserWS(httpServer, browserManager) {
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({ noServer: true, perMessageDeflate: false });
 
   httpServer.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url, 'http://localhost');
@@ -210,6 +210,15 @@ function attachBrowserWS(httpServer, browserManager) {
         switch (msg.type) {
           case 'navigate':
             instance.navigate(msg.url).catch(() => {});
+            break;
+          case 'back':
+            instance.goBack().catch(() => {});
+            break;
+          case 'forward':
+            instance.goForward().catch(() => {});
+            break;
+          case 'reload':
+            instance.reload().catch(() => {});
             break;
           case 'click':
             instance.click(

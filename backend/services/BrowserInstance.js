@@ -41,11 +41,7 @@ class BrowserInstance {
   // --- Viewer Management ---
 
   addViewer(ws) {
-    this.viewers.add(ws);
-    if (this.viewers.size === 1) {
-      this.startScreencast();
-    }
-    // Send initial metadata
+    // Send initial metadata before adding to viewers / starting screencast
     this._sendJSON(ws, {
       type: 'connected',
       id: this.id,
@@ -54,6 +50,11 @@ class BrowserInstance {
       controlMode: this.controlMode,
       viewport: this.viewportSize,
     });
+
+    this.viewers.add(ws);
+    if (this.viewers.size === 1) {
+      this.startScreencast();
+    }
   }
 
   removeViewer(ws) {
@@ -131,6 +132,21 @@ class BrowserInstance {
   async pressKey(key) {
     this.lastActivity = Date.now();
     await this.page.keyboard.press(key);
+  }
+
+  async goBack() {
+    this.lastActivity = Date.now();
+    await this.page.goBack({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {});
+  }
+
+  async goForward() {
+    this.lastActivity = Date.now();
+    await this.page.goForward({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {});
+  }
+
+  async reload() {
+    this.lastActivity = Date.now();
+    await this.page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
   }
 
   async scroll(x, y, deltaY) {

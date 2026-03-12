@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 
@@ -154,30 +154,27 @@ const STORAGE_KEY = 'clawmander-sidebar-collapsed';
 
 export default function Sidebar({ mobileOpen, onMobileClose }) {
   const router = useRouter();
-  const [collapsed, setCollapsed] = useState(true);
+  // Read localStorage synchronously via lazy initializer to avoid layout shift.
+  // On the server / first SSR paint we fall back to `true` (collapsed), but the
+  // `mounted` flag hides the sidebar until the real value is applied, preventing
+  // any visible twitch.
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored !== null) return stored === 'true';
+    return window.innerWidth < 1024;
+  });
   const [mounted, setMounted] = useState(false);
   const [enableTransition, setEnableTransition] = useState(false);
-  const initializedRef = useRef(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored !== null) {
-      setCollapsed(stored === 'true');
-    } else {
-      setCollapsed(window.innerWidth < 1024);
-    }
     setMounted(true);
-
-    // Enable transitions only after the correct state has been painted,
-    // so the initial localStorage read doesn't cause a visible animation.
-    if (!initializedRef.current) {
-      initializedRef.current = true;
+    // Enable transitions after first paint so the initial state doesn't animate.
+    requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setEnableTransition(true);
-        });
+        setEnableTransition(true);
       });
-    }
+    });
   }, []);
 
   const toggle = () => {
@@ -208,6 +205,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }) {
           ${enableTransition ? 'transition-all duration-200' : ''}
           flex-shrink-0 overflow-hidden
           hidden md:flex
+          ${!mounted ? 'invisible' : ''}
           ${mobileOpen ? '!flex fixed inset-y-0 left-0 z-50 w-52' : ''}
         `}
       >

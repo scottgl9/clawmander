@@ -157,12 +157,14 @@ if (config.testMode) {
 setInterval(() => authDB.cleanupExpiredTokens(), 60 * 60 * 1000);
 
 // Cleanup stale tasks on startup
+taskService.reconcileStale();
 taskService.cleanupDoneTasks();
 taskService.cleanupOldTasks();
 
 // Hourly: remove tasks older than 24h; also do midnight cleanup once per day
 let lastCleanupDate = new Date().toDateString();
 setInterval(() => {
+  taskService.reconcileStale();
   taskService.cleanupOldTasks();
   const today = new Date().toDateString();
   if (today !== lastCleanupDate) {
