@@ -21,4 +21,11 @@ module.exports = {
     expiry: process.env.JWT_EXPIRY || '15m',
     refreshExpiry: process.env.JWT_REFRESH_EXPIRY || '7d',
   },
+  browser: {
+    maxInstances: parseInt(process.env.BROWSER_MAX_INSTANCES || '5', 10),
+    idleTimeoutMs: parseInt(process.env.BROWSER_IDLE_TIMEOUT_MS || '1800000', 10),
+    profileDir: process.env.BROWSER_PROFILE_DIR || path.join(os.homedir(), '.openclaw', 'browser-profiles'),
+    viewport: { width: 1280, height: 800 },
+    screencast: { format: 'jpeg', quality: 60 },
+  },
 };
