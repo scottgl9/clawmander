@@ -40,6 +40,8 @@ export function useSSE(onEvent) {
       'budget.transaction_created', 'budget.transaction_updated', 'budget.transaction_deleted',
       'budget.category_created', 'budget.category_updated', 'budget.category_deleted',
       'drawing.created', 'drawing.updated', 'drawing.deleted',
+      'browser.created', 'browser.destroyed', 'browser.control_changed',
+      'browser.control_requested', 'browser.url_changed',
     ];
     events.forEach((evt) => {
       es.addEventListener(evt, (e) => {

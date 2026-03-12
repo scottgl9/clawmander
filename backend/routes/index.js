@@ -15,9 +15,10 @@ const memoryRoutes = require('./memory');
 const drawingsRoutes = require('./drawings');
 const voiceRoutes = require('./voice');
 const authRoutes = require('./auth');
+const { browserRoutes } = require('./browser');
 
 module.exports = function mountRoutes(app, services) {
-  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService, cronService, memoryService, drawingService, config, authDB } = services;
+  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService, cronService, memoryService, drawingService, config, authDB, browserManager } = services;
 
   // Auth routes (no auth required — handles its own)
   app.use('/api/auth', authRoutes(authDB, config));
@@ -49,4 +50,5 @@ module.exports = function mountRoutes(app, services) {
   app.use('/api/memory', memoryRoutes(memoryService));
   app.use('/api/drawings', drawingsRoutes(drawingService));
   app.use('/api/voice', voiceRoutes(config));
+  app.use('/api/browser', browserRoutes(browserManager));
 };
