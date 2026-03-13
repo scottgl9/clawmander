@@ -4,24 +4,7 @@ const os = require('os');
 const { v4: uuidv4 } = require('uuid');
 
 const SYSTEM_USERNAME = os.userInfo().username;
-
-// Exec completion notifications are injected by the gateway in two ways:
-//   1. As standalone role:"toolResult" toolName:"exec" messages → caught by role filter
-//   2. Appended onto user message content (same role:"user") → caught by stripExecSuffix
-//
-// Pattern: mandatory whitespace before "System:" so we don't strip user-typed
-// text that merely starts with "System:" (no preceding text to strip from).
-const EXEC_SUFFIX_RE = /\s+System: \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)[\s\S]*/;
-// Whole-content check — entire message is just a notification (no real user text)
-const EXEC_ONLY_RE = /^System: \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)/;
-
-function stripExecSuffix(text) {
-  if (!text || typeof text !== 'string') return text;
-  // Filter whole-content notifications (entire message is a system event)
-  if (EXEC_ONLY_RE.test(text.trimStart())) return '';
-  // Strip notification appended to end of real user message
-  return text.replace(EXEC_SUFFIX_RE, '').trimEnd();
-}
+const { EXEC_SUFFIX_RE, EXEC_ONLY_RE, stripExecSuffix } = require('../lib/execPatterns');
 
 // Normalize OpenClaw gateway chat.history response into Clawmander message format
 function normalizeGatewayHistory(result, sessionKey) {

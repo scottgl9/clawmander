@@ -14,12 +14,13 @@ export function useChatState() {
   }, []);
   // messages: Map<sessionKey, Message[]>
   const [messages, setMessages] = useState({});
-  const [streamingContent, setStreamingContent] = useState(''); // accumulated delta text
-  const [streamingRunId, setStreamingRunId] = useState(null);
+  // Per-session streaming state maps (Fix #5)
+  const [streamingContentMap, setStreamingContentMap] = useState({});
+  const [streamingRunIdMap, setStreamingRunIdMap] = useState({});
+  const [sendingMap, setSendingMap] = useState({});
   const [approvalPending, setApprovalPending] = useState(null);
   const [subagentActivity, setSubagentActivity] = useState([]);
   const [connected, setConnected] = useState(false);
-  const [sending, setSending] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [error, setError] = useState(null);
 
@@ -30,6 +31,11 @@ export function useChatState() {
 
   // Keep activeSessionRef in sync to avoid stale closures in SSE handler
   useEffect(() => { activeSessionRef.current = activeSession; }, [activeSession]);
+
+  // Derive current-session values for backward-compatible return API
+  const sending = activeSession ? (sendingMap[activeSession] || false) : false;
+  const streamingContent = activeSession ? (streamingContentMap[activeSession] || '') : '';
+  const streamingRunId = activeSession ? (streamingRunIdMap[activeSession] || null) : null;
 
   // Load sessions + models
   const loadSessions = useCallback(async () => {
@@ -70,11 +76,23 @@ export function useChatState() {
           lastAssistant.state = 'streaming';
           lastAssistant.runId = activeRunId;
         }
-        setStreamingRunId(activeRunId);
+        setStreamingRunIdMap((prev) => ({ ...prev, [sessionKey]: activeRunId }));
         streamingRef.current = { runId: activeRunId, content: lastAssistant?.content || '' };
       }
 
-      setMessages((prev) => ({ ...prev, [sessionKey]: history }));
+      // Fix #6: Merge rather than replace — preserve mid-stream messages
+      setMessages((prev) => {
+        const current = prev[sessionKey] || [];
+        const streaming = current.filter((m) => m.state === 'streaming' && m.runId);
+        if (streaming.length === 0) return { ...prev, [sessionKey]: history };
+        const merged = [...history];
+        for (const sm of streaming) {
+          const idx = merged.findIndex((m) => m.runId === sm.runId);
+          if (idx !== -1) merged[idx] = sm;
+          else merged.push(sm);
+        }
+        return { ...prev, [sessionKey]: merged };
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -84,15 +102,9 @@ export function useChatState() {
   // Keep ref in sync so handleSSEEvent ([] deps) can call loadHistory without stale closure
   loadHistoryRef.current = loadHistory;
 
-  // Switch session
+  // Switch session — no longer clears streaming state (Fix #5: each session has its own)
   const switchSession = useCallback((sessionKey) => {
     setActiveSession(sessionKey);
-    // Don't clear streaming state — the SSE handlers will continue updating
-    // whichever session the event belongs to via sessionKey matching.
-    // Only reset the visual streaming indicator (it's per-session in the UI).
-    setStreamingContent('');
-    setStreamingRunId(null);
-    streamingRef.current = { runId: null, content: '' };
     loadHistory(sessionKey);
   }, [loadHistory]);
 
@@ -104,8 +116,8 @@ export function useChatState() {
         if (!text) break;
 
         streamingRef.current = { runId, content: text };
-        setStreamingRunId(runId);
-        setStreamingContent(text);
+        setStreamingRunIdMap((prev) => ({ ...prev, [sessionKey]: runId }));
+        setStreamingContentMap((prev) => ({ ...prev, [sessionKey]: text }));
 
         setMessages((prev) => {
           const sessionMsgs = prev[sessionKey] || [];
@@ -145,8 +157,8 @@ export function useChatState() {
       case 'chat.final': {
         const { sessionKey, runId, text } = event.data;
         streamingRef.current = { runId: null, content: '' };
-        setStreamingRunId(null);
-        setStreamingContent('');
+        setStreamingRunIdMap((prev) => ({ ...prev, [sessionKey]: null }));
+        setStreamingContentMap((prev) => ({ ...prev, [sessionKey]: '' }));
 
         setMessages((prev) => {
           const sessionMsgs = prev[sessionKey] || [];
@@ -184,14 +196,14 @@ export function useChatState() {
           setTimeout(() => loadHistoryRef.current?.(sessionKey), 0);
           return prev;
         });
-        setSending(false);
+        setSendingMap((prev) => ({ ...prev, [sessionKey]: false }));
         break;
       }
       case 'chat.error': {
         const { sessionKey, runId, error: errMsg } = event.data;
         streamingRef.current = { runId: null, content: '' };
-        setStreamingRunId(null);
-        setStreamingContent('');
+        setStreamingRunIdMap((prev) => ({ ...prev, [sessionKey]: null }));
+        setStreamingContentMap((prev) => ({ ...prev, [sessionKey]: '' }));
         setMessages((prev) => {
           const sessionMsgs = prev[sessionKey] || [];
           const idx = sessionMsgs.findIndex((m) => m.runId === runId && m.role === 'assistant');
@@ -200,17 +212,26 @@ export function useChatState() {
             updated[idx] = { ...updated[idx], state: 'error', content: `Error: ${errMsg}` };
             return { ...prev, [sessionKey]: updated };
           }
+          // Fix #3: Claim runId-less placeholder on error (zombie streaming placeholder)
+          const placeholderIdx = sessionMsgs.findIndex(
+            (m) => !m.runId && m.role === 'assistant' && m.state === 'streaming'
+          );
+          if (placeholderIdx !== -1) {
+            const updated = [...sessionMsgs];
+            updated[placeholderIdx] = { ...updated[placeholderIdx], runId, state: 'error', content: `Error: ${errMsg}` };
+            return { ...prev, [sessionKey]: updated };
+          }
           return prev;
         });
-        setSending(false);
+        setSendingMap((prev) => ({ ...prev, [sessionKey]: false }));
         setError(errMsg);
         break;
       }
       case 'chat.aborted': {
         const { sessionKey, runId } = event.data;
         streamingRef.current = { runId: null, content: '' };
-        setStreamingRunId(null);
-        setStreamingContent('');
+        setStreamingRunIdMap((prev) => ({ ...prev, [sessionKey]: null }));
+        setStreamingContentMap((prev) => ({ ...prev, [sessionKey]: '' }));
         setMessages((prev) => {
           const sessionMsgs = prev[sessionKey] || [];
           const idx = sessionMsgs.findIndex((m) => m.runId === runId && m.role === 'assistant');
@@ -221,7 +242,7 @@ export function useChatState() {
           }
           return prev;
         });
-        setSending(false);
+        setSendingMap((prev) => ({ ...prev, [sessionKey]: false }));
         break;
       }
       case 'chat.approval':
@@ -239,7 +260,10 @@ export function useChatState() {
         if (activeSessionRef.current) {
           loadHistoryRef.current?.(activeSessionRef.current);
         }
-        setSending(false);
+        setSendingMap((prev) => {
+          if (!activeSessionRef.current) return prev;
+          return { ...prev, [activeSessionRef.current]: false };
+        });
         break;
       default:
         break;
@@ -248,7 +272,9 @@ export function useChatState() {
 
   // Send a message (or slash command)
   const sendMessage = useCallback(async (text, attachments = []) => {
-    if (!activeSession || !text.trim() || sending) return;
+    if (!activeSession || !text.trim()) return;
+    // Per-session sending guard
+    if (sendingMap[activeSession]) return;
 
     // Handle slash commands
     if (text.startsWith('/')) {
@@ -256,7 +282,7 @@ export function useChatState() {
     }
 
     setError(null);
-    setSending(true);
+    setSendingMap((prev) => ({ ...prev, [activeSession]: true }));
 
     // Optimistically add user message to UI
     const tempUserMsg = {
@@ -286,7 +312,7 @@ export function useChatState() {
     try {
       await chatApi.send(activeSession, text, attachments);
     } catch (err) {
-      setSending(false);
+      setSendingMap((prev) => ({ ...prev, [activeSession]: false }));
       setError(err.message);
       // Remove placeholder on failure
       setMessages((prev) => {
@@ -296,7 +322,7 @@ export function useChatState() {
         return { ...prev, [activeSession]: sessionMsgs };
       });
     }
-  }, [activeSession, sending]);
+  }, [activeSession, sendingMap]);
 
   // Inject a local-only system message (not sent to gateway)
   const injectSystemMessage = useCallback((sessionKey, content) => {
