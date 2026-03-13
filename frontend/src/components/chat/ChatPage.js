@@ -102,6 +102,21 @@ export default function ChatPage({ onConnectionChange }) {
     catch (err) { setError(err.message); }
   }, [activeSession, setError]);
 
+  // Retry: find the last user message before the errored assistant message and resend it
+  const handleRetry = useCallback((errorMsg) => {
+    if (!activeSession) return;
+    const msgs = messages[activeSession] || [];
+    const errIdx = msgs.findIndex((m) => m.id === errorMsg.id);
+    if (errIdx < 0) return;
+    // Walk backwards to find the preceding user message
+    for (let i = errIdx - 1; i >= 0; i--) {
+      if (msgs[i].role === 'user' && msgs[i].content) {
+        sendMessage(msgs[i].content, msgs[i].attachments || []);
+        return;
+      }
+    }
+  }, [activeSession, messages, sendMessage]);
+
   const openDropdown = useCallback(() => {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (rect) setDropdownRect(rect);
@@ -232,7 +247,7 @@ export default function ChatPage({ onConnectionChange }) {
           </div>
         ) : (
           <>
-            <MessageList messages={currentMessages} loading={loadingHistory} onSpeak={handleSpeak} />
+            <MessageList messages={currentMessages} loading={loadingHistory} onSpeak={handleSpeak} onRetry={handleRetry} />
             <SubagentBadge activity={subagentActivity} />
             <ApprovalBanner approval={approvalPending} onResolved={() => setApprovalPending(null)} />
             {error && (
