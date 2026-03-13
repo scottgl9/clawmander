@@ -6,11 +6,7 @@
 const WebSocket = require('ws');
 const config = require('../config/config');
 const { identity: deviceIdentity, buildAuthPayloadV3, sign: signPayload, publicKeyRawBase64Url } = require('./DeviceIdentity');
-
-// Strip exec completion notifications appended to user message content.
-// Requires preceding whitespace so user-typed "System: ..." at the start is not stripped.
-const EXEC_SUFFIX_RE = /\s+System: \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)[\s\S]*/;
-const EXEC_ONLY_RE = /^System: \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\] (?:Exec completed|Exec started|Exec failed|HEARTBEAT_OK|Process exited)/;
+const { EXEC_SUFFIX_RE, EXEC_ONLY_RE } = require('../lib/execPatterns');
 
 
 
@@ -534,7 +530,7 @@ class ChatGatewayClient {
   }
 
   async resolveApproval(approvalId, decision) {
-    return this._sendRequest('exec.approval-resolve', { id: approvalId, decision });
+    return this._sendRequest('exec.approval.resolve', { id: approvalId, decision });
   }
 }
 
