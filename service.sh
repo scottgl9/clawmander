@@ -98,8 +98,9 @@ uninstall_services() {
 
     # Stop services if running
     print_info "Stopping services..."
-    systemctl --user stop "$BACKEND_SERVICE" 2>/dev/null || true
     systemctl --user stop "$FRONTEND_SERVICE" 2>/dev/null || true
+    systemctl --user stop "$BACKEND_SERVICE" 2>/dev/null || true
+    kill_stale_processes
 
     # Disable services
     print_info "Disabling services..."
@@ -126,17 +127,42 @@ start_services() {
     status_services
 }
 
+kill_stale_processes() {
+    # Kill any orphaned node processes from previous runs that systemd didn't clean up
+    local killed=0
+    for pattern in "node.*clawmander.*server" "next.*clawmander" "node.*clawmander/frontend" "node.*clawmander/backend"; do
+        if pgrep -f "$pattern" > /dev/null 2>&1; then
+            pkill -f "$pattern" 2>/dev/null && killed=$((killed + 1))
+        fi
+    done
+    # Also free the ports in case zombie processes are holding them
+    for port in 3001 3000; do
+        if fuser "$port/tcp" > /dev/null 2>&1; then
+            fuser -k "$port/tcp" > /dev/null 2>&1 && killed=$((killed + 1))
+            print_info "Freed port $port"
+        fi
+    done
+    if [[ $killed -gt 0 ]]; then
+        print_info "Killed $killed stale process/port(s)"
+        sleep 1
+    fi
+}
+
 stop_services() {
     print_info "Stopping Clawmander services..."
-    systemctl --user stop "$FRONTEND_SERVICE"
-    systemctl --user stop "$BACKEND_SERVICE"
+    systemctl --user stop "$FRONTEND_SERVICE" 2>/dev/null || true
+    systemctl --user stop "$BACKEND_SERVICE" 2>/dev/null || true
+    kill_stale_processes
     print_success "Services stopped"
 }
 
 restart_services() {
     print_info "Restarting Clawmander services..."
-    systemctl --user restart "$BACKEND_SERVICE"
-    systemctl --user restart "$FRONTEND_SERVICE"
+    systemctl --user stop "$FRONTEND_SERVICE" 2>/dev/null || true
+    systemctl --user stop "$BACKEND_SERVICE" 2>/dev/null || true
+    kill_stale_processes
+    systemctl --user start "$BACKEND_SERVICE"
+    systemctl --user start "$FRONTEND_SERVICE"
     print_success "Services restarted"
     echo ""
     status_services
@@ -191,8 +217,9 @@ Commands:
     install         Build project, then install and enable systemd services
     uninstall       Stop, disable, and remove systemd services
     start           Start both backend and frontend services
-    stop            Stop both services
-    restart         Restart both services
+    stop            Stop both services and kill stale processes
+    kill            Kill all stale Clawmander node processes
+    restart         Restart both services (kills stale processes first)
     status          Show status of both services
     logs [service]  Show logs (options: backend, frontend, or both)
     enable-boot     Enable services to start on system boot
@@ -233,6 +260,11 @@ case "${1:-}" in
         ;;
     stop)
         stop_services
+        ;;
+    kill)
+        print_info "Killing stale Clawmander processes..."
+        kill_stale_processes
+        print_success "Done"
         ;;
     restart)
         restart_services

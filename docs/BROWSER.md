@@ -1,236 +1,243 @@
-# Virtual Browser System
+# Clawmander Virtual Browser
 
-A persistent, shared browser running on the gateway machine that agents can drive programmatically and the user can view/control from the frontend.
+## Vision
+
+A persistent, shared browser instance running on the gateway machine that both OpenClaw agents and the human user can access simultaneously. The browser is a **collaboration surface** — agents do the automated work, and the user steps in when human presence is required (login, CAPTCHA, 2FA, consent flows).
+
+---
+
+## Core Concept
+
+```
+Gateway machine (homelab)
+  └── Chromium (headless, persistent profile)
+        ↕ CDP (Chrome DevTools Protocol)
+  └── BrowserService (Node.js)
+        ↕ WebSocket (/ws/browser)
+  └── OpenClaw Agent ──→ browser tools (navigate, click, type, screenshot, scrape)
+        ↕
+  └── Clawmander Frontend (any Tailscale node)
+        └── <BrowserPanel> — live view, URL bar, mouse/keyboard passthrough
+```
+
+The browser runs **headless but persistent** on the gateway. Its state (cookies, sessions, localStorage) survives across agent tasks. Agents can navigate and interact programmatically. The user can watch and take over at any time via the frontend panel.
+
+---
+
+## Use Cases
+
+### Agent-driven
+- Web research: navigate, read, extract structured data
+- Form filling: fill and submit forms on behalf of the user
+- Monitoring: check dashboards, prices, statuses on a schedule
+- Automation: multi-step workflows (purchase flows, booking, etc.)
+- Screenshot capture: visual confirmation of agent actions
+
+### Human-assisted
+- **Login hand-off**: agent hits a login wall → notifies user → user logs in via the panel → agent resumes
+- **CAPTCHA / 2FA**: agent pauses, user solves in the live view, agent continues
+- **Confirmation gates**: agent presents a prefilled form → user reviews and submits
+- **Guided exploration**: user navigates to a page → hands control back to agent for scraping/interaction
+
+### Collaborative
+- Agent navigates to a complex page, highlights elements it's uncertain about, asks user to confirm before clicking
+- User opens a page manually, agent takes over to fill/extract
+- Shared session state: agent logs in once (with user help), agent reuses session for subsequent tasks
+
+---
 
 ## Architecture
 
-```
-Gateway Machine
-  └── BrowserManager (orchestrates instances)
-        └── BrowserInstance "default" → Chromium (persistent profile ~/.openclaw/browser-profiles/default/)
-        └── BrowserInstance "agent-xyz" → Chromium (persistent profile ~/.openclaw/browser-profiles/agent-xyz/)
-  └── WebSocket /ws/browser/:id (JPEG frame streaming + user input)
-  └── REST /api/browser/* (agent tools + CRUD)
-  └── SSE (browser.* events for UI state)
-```
+### Backend: BrowserService
 
-**Key design decisions:**
-- Each instance uses `chromium.launchPersistentContext()` with its own profile directory — cookies, localStorage, and sessions persist across restarts.
-- Binary WebSocket frames (JPEG bytes, not base64-in-JSON) for half the bandwidth.
-- CDP `Page.startScreencast` only active when viewers are connected.
-- Control modes (`agent` | `user` | `shared`) enable human-in-the-loop hand-off.
+`backend/services/BrowserService.js`
 
-## Setup
+- Launches a **persistent Chromium instance** via Playwright with a named profile directory (survives restarts)
+- Uses **CDP Page.startScreencast** for efficient JPEG frame streaming
+- Exposes a **control API** used by both agent tools and the WebSocket handler:
+  - `navigate(url)`
+  - `click(x, y)`
+  - `type(text)`
+  - `scroll(x, y, deltaY)`
+  - `screenshot()` → base64 PNG
+  - `getPageContent()` → HTML / text / DOM snapshot
+  - `evaluate(js)` → run arbitrary JS in page context
+  - `waitForSelector(selector, timeout)`
+  - `getCurrentUrl()` / `getTitle()`
+- Manages **control mode**: `agent` | `user` | `shared`
+  - In `agent` mode: user input from frontend is ignored
+  - In `user` mode: agent actions are queued but not executed
+  - In `shared` mode: both active (last-write-wins, visually indicated)
+- Emits **events** over an internal EventEmitter: `frame`, `url-changed`, `page-loaded`, `control-changed`, `browser-message`
 
-### Install Chromium
+### Backend: WebSocket Endpoint
 
-```bash
-cd backend
-npm install
-npx playwright install chromium
-```
+`backend/routes/browser.js` → `/ws/browser`
 
-### Configuration
-
-| Environment Variable | Default | Description |
-|---|---|---|
-| `BROWSER_MAX_INSTANCES` | `5` | Maximum concurrent browser instances |
-| `BROWSER_IDLE_TIMEOUT_MS` | `1800000` (30min) | Idle timeout before auto-destroying instance |
-| `BROWSER_PROFILE_DIR` | `~/.openclaw/browser-profiles` | Directory for persistent browser profiles |
-
-## REST API Reference
-
-All endpoints require authentication via `Authorization: Bearer <token>` header.
-
-### List Instances
-```
-GET /api/browser
-→ [{ id, url, controlMode, viewers, lastActivity, viewport }]
+**Server → Client messages:**
+```jsonc
+{ "type": "frame", "data": "<base64 JPEG>", "width": 1280, "height": 800 }
+{ "type": "url", "url": "https://example.com" }
+{ "type": "control", "mode": "agent" | "user" | "shared", "reason": "Login required" }
+{ "type": "agent-message", "text": "I need you to log in to continue." }
+{ "type": "page-loaded", "url": "...", "title": "..." }
+{ "type": "cursor", "x": 0.5, "y": 0.3 }  // agent cursor position (normalized 0–1)
 ```
 
-### Create Instance
-```
-POST /api/browser
-Body: { "id": "my-browser" }  (optional, auto-generated if omitted)
-→ 201 { id, url, controlMode, viewers, lastActivity, viewport }
-→ 409 if ID already exists
-→ 429 if max instances reached
-```
-
-### Get Instance Detail
-```
-GET /api/browser/:id
-→ { id, url, controlMode, viewers, lastActivity, viewport }
-→ 404 if not found
+**Client → Server messages:**
+```jsonc
+{ "type": "navigate", "url": "https://..." }
+{ "type": "click", "x": 0.4, "y": 0.6 }    // normalized coordinates
+{ "type": "type", "text": "hello" }
+{ "type": "key", "key": "Enter" }
+{ "type": "scroll", "x": 0.5, "y": 0.5, "delta": -300 }
+{ "type": "take-control" }   // user requests control
+{ "type": "release-control" } // user hands back to agent
 ```
 
-### Destroy Instance
-```
-DELETE /api/browser/:id
-→ { ok: true }
-→ 404 if not found
-```
+### Frontend: BrowserPanel Component
 
-### Navigate
-```
-POST /api/browser/:id/navigate
-Body: { "url": "https://example.com" }
-→ { url, title }
-```
+`frontend/src/components/browser/BrowserPanel.js`
 
-### Click
-```
-POST /api/browser/:id/click
-Body: { "x": 100, "y": 200 }  or  { "selector": "#button" }
-→ { ok: true }
-```
+- **Canvas element** rendering incoming JPEG frames at native resolution
+- **URL bar** showing current URL, editable to navigate
+- **Control indicator**: colored badge — 🤖 Agent / 👤 You / 🤝 Shared
+- **Take Control / Hand Back** button
+- **Agent message overlay**: when agent needs user help, shows a prominent banner with context (e.g. "Please log in to Gmail to continue")
+- **Agent cursor ghost**: semi-transparent dot showing where the agent last clicked
+- Input forwarding:
+  - Mouse: `click`, `mousemove` (for hover), `wheel` for scroll
+  - Keyboard: captured when panel is focused
+  - Coordinates normalized to 0–1, denormalized server-side against actual viewport
 
-### Type Text
-```
-POST /api/browser/:id/type
-Body: { "text": "hello world" }
-→ { ok: true }
-```
+### Frontend: Browser Page / Tab
 
-### Press Key
-```
-POST /api/browser/:id/key
-Body: { "key": "Enter" }
-→ { ok: true }
-```
+`frontend/src/pages/browser.js`
 
-### Scroll
-```
-POST /api/browser/:id/scroll
-Body: { "x": 640, "y": 400, "delta": -300 }
-→ { ok: true }
-```
+- Dedicated `/browser` route in the UI
+- Can also be embedded as a drawer/panel alongside the chat UI
+- Connection status, reconnect on drop
+- History/back/forward buttons (calls `window.history` equivalent via CDP)
 
-### Screenshot
+---
+
+## Agent Integration
+
+### OpenClaw Tool Interface
+
+Agents access the browser via a set of tools exposed through the backend:
+
 ```
-POST /api/browser/:id/screenshot
-→ { image: "<base64 PNG>", width: 1280, height: 800 }
+browser_navigate(url)
+browser_click(selector | {x, y})
+browser_type(text)
+browser_screenshot() → base64
+browser_get_text(selector?) → string
+browser_evaluate(js) → any
+browser_wait_for(selector, timeout?)
+browser_request_user_control(reason) → waits until user releases
+browser_get_current_url() → string
 ```
 
-### Evaluate JavaScript
+`browser_request_user_control(reason)` is the key human-in-the-loop primitive:
+1. Agent calls it with a reason string ("Login required for Gmail")
+2. BrowserService switches mode to `user`, emits `control` event with the reason
+3. Frontend shows prominent banner: "Agent needs your help: Login required for Gmail"
+4. User performs the action in the live browser panel
+5. User clicks "Done / Hand Back"
+6. BrowserService switches mode back to `agent`, tool resolves
+7. Agent continues
+
+### Wiring into OpenClaw
+
+These tools are registered as capabilities on agents that have browser access. Only agents explicitly granted `browser` capability can call them. The gateway exposes a `/browser-tools` internal API that the OpenClaw runtime calls.
+
+---
+
+## Session Persistence
+
+- Chromium runs with a **named user data directory** (`~/.openclaw/browser-profile/`)
+- Cookies, localStorage, and logged-in sessions persist across gateway restarts
+- Profile is per-gateway-machine (not per-user — this is a single-user setup)
+- Optional: multiple named profiles for different identities/contexts
+
+---
+
+## Security Considerations
+
+- The `/ws/browser` endpoint is only accessible to authenticated Clawmander users
+- Agent browser access is gated by capability config in `openclaw.json`
+- No public exposure — all traffic over Tailscale
+- User can always take control and override agent actions
+- Sensitive pages (password managers, banking) should be noted in agent instructions as off-limits unless user-initiated
+
+---
+
+## Implementation Phases
+
+### Phase 1 — Live View (MVP)
+- BrowserService with Playwright + CDP screencast
+- `/ws/browser` WebSocket (frames only, no input yet)
+- `<BrowserPanel>` canvas rendering frames
+- `/browser` page in frontend
+- URL bar (read-only display)
+
+### Phase 2 — User Control
+- Input forwarding (click, type, scroll, key)
+- Editable URL bar with navigate
+- Take Control / Release buttons
+- Control mode indicator
+
+### Phase 3 — Agent Tools
+- `browser_*` tool functions in BrowserService
+- OpenClaw tool registration
+- Agent cursor ghost overlay in frontend
+- `browser_request_user_control` hand-off flow
+
+### Phase 4 — Polish
+- Agent message overlay / banner
+- Session persistence (named profile)
+- Multiple tab support
+- Back/forward/reload controls
+- Keyboard shortcut to toggle browser panel alongside chat
+
+---
+
+## File Layout
+
 ```
-POST /api/browser/:id/evaluate
-Body: { "script": "document.title" }
-→ { result: "Page Title" }
-```
+backend/
+  services/
+    BrowserService.js        ← core Playwright + CDP service
+  routes/
+    browser.js               ← /ws/browser WebSocket handler
+  tools/
+    browserTools.js          ← agent tool definitions
 
-### Get Page Content
-```
-POST /api/browser/:id/content
-Body: { "selector": "#main" }  (optional)
-→ { text: "...", html: "..." }
-```
-
-### Wait for Selector
-```
-POST /api/browser/:id/wait
-Body: { "selector": ".loaded", "timeout": 5000 }
-→ { found: true }
-```
-
-### Set Control Mode
-```
-POST /api/browser/:id/control
-Body: { "mode": "agent", "reason": "Automated browsing" }
-→ { ok: true, mode: "agent" }
-```
-
-### Request User Control (Blocking)
-```
-POST /api/browser/:id/request-user-control
-Body: { "reason": "Please complete 2FA" }
-→ Blocks until user clicks "Hand Back to Agent"
-→ { timedOut: false }  or  { timedOut: true } (after 5min)
-```
-
-## WebSocket Protocol
-
-Connect to `/ws/browser/:id`. Frames are binary (JPEG); control messages are JSON.
-
-### Server → Client
-
-| Type | Format | Description |
-|---|---|---|
-| (binary) | Raw JPEG bytes | Screencast frame |
-| `connected` | JSON | Initial connection info: `{ type, id, url, title, controlMode, viewport }` |
-| `meta` | JSON | URL/title update: `{ type, url, title, controlMode }` |
-| `control` | JSON | Control mode change: `{ type, mode, reason }` |
-| `agent-message` | JSON | Agent needs help: `{ type, message }` |
-
-### Client → Server
-
-| Type | Fields | Description |
-|---|---|---|
-| `navigate` | `{ url }` | Navigate to URL |
-| `click` | `{ x, y }` | Click (normalized 0-1 coordinates) |
-| `type` | `{ text }` | Type text |
-| `key` | `{ key }` | Press key |
-| `scroll` | `{ x, y, delta }` | Scroll (normalized coords + deltaY) |
-| `mousemove` | `{ x, y }` | Mouse move (normalized) |
-| `take-control` | `{}` | User takes control |
-| `release-control` | `{}` | User releases control back to agent |
-
-Input from WebSocket is dropped when `controlMode === 'agent'`.
-
-## SSE Events
-
-| Event | Data | Description |
-|---|---|---|
-| `browser.created` | Instance info | New instance created |
-| `browser.destroyed` | `{ id }` | Instance destroyed |
-| `browser.control_changed` | `{ id, mode, reason }` | Control mode changed |
-| `browser.url_changed` | `{ id, url }` | Browser navigated |
-
-## Agent Tool Usage Examples
-
-### Basic Navigation
-```bash
-# Create an instance
-curl -X POST localhost:3001/api/browser \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer <token>' \
-  -d '{"id":"research"}'
-
-# Navigate to a page
-curl -X POST localhost:3001/api/browser/research/navigate \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer <token>' \
-  -d '{"url":"https://example.com"}'
-
-# Take a screenshot
-curl -X POST localhost:3001/api/browser/research/screenshot \
-  -H 'Authorization: Bearer <token>'
-
-# Get page text
-curl -X POST localhost:3001/api/browser/research/content \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer <token>' \
-  -d '{"selector":"body"}'
+frontend/
+  src/
+    pages/
+      browser.js             ← /browser route
+    components/
+      browser/
+        BrowserPanel.js      ← canvas + controls
+        ControlBadge.js      ← agent/user/shared indicator
+        AgentMessageBanner.js ← "agent needs help" overlay
+        UrlBar.js            ← address bar component
+    hooks/
+      useBrowser.js          ← WebSocket connection + state
 ```
 
-### Human-in-the-Loop Hand-off
+---
 
-1. Agent navigates to a login page
-2. Agent calls `POST /api/browser/:id/request-user-control` with `{ "reason": "Please log in" }`
-3. Frontend shows amber banner: "Agent needs your help: Please log in"
-4. User logs in manually via the browser canvas
-5. User clicks "Hand Back to Agent"
-6. The `request-user-control` endpoint returns `{ timedOut: false }`
-7. Agent continues automated work
+## Dependencies to Add
 
-## Multi-Instance Usage
+```
+backend:  playwright (already likely present), ws (already used)
+frontend: none (canvas API is native)
+system:   chromium-browser or chromium (apt) on the gateway machine
+```
 
-Each agent can create its own browser instance. All instances are listed in the frontend with tabbed navigation. Instances auto-destroy after 30 minutes of inactivity (no viewers and no agent API calls).
+---
 
-## Troubleshooting
-
-- **"Failed to load playwright"**: Run `cd backend && npm install && npx playwright install chromium`
-- **Chromium crashes**: Try increasing shared memory: `--disable-dev-shm-usage` (already set by default)
-- **Blank canvas**: Check that the WebSocket connection is established (green status indicator)
-- **"Maximum browser instances reached"**: Destroy unused instances or increase `BROWSER_MAX_INSTANCES`
-- **Stale sessions**: Browser profiles persist in `~/.openclaw/browser-profiles/`. Delete the profile directory to reset.
+*Written: 2026-03-11*
