@@ -81,9 +81,13 @@ export default function DrawPage({ onConnectionChange }) {
   }, [activeDrawingId]);
 
   const handleCreate = useCallback(async () => {
-    const drawing = await api.drawings.create({ title: `Drawing ${(drawings?.length || 0) + 1}` });
-    setActiveDrawingId(drawing.id);
-    setRefreshKey((k) => k + 1);
+    try {
+      const drawing = await api.drawings.create({ title: `Drawing ${(drawings?.length || 0) + 1}` });
+      setActiveDrawingId(drawing.id);
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      console.error('[Draw] Failed to create drawing:', err.message);
+    }
   }, [drawings]);
 
   const handleDelete = useCallback(async (id) => {
