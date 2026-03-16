@@ -29,6 +29,7 @@ Read operations (`GET`) are open. The token is set via `AUTH_TOKEN` in `backend/
 | Dashboard Views | [skills/skill-views.md](skills/skill-views.md) | Aggregated daily/weekly/monthly views, activity log |
 | System & Events | [skills/skill-system.md](skills/skill-system.md) | Health checks, SSE real-time events, commands |
 | PersonaSync | [skills/skill-personasync.md](skills/skill-personasync.md) | Sync and query phone data |
+| Virtual Browser | [skills/skill-browser.md](skills/skill-browser.md) | Control persistent Chrome instances for web automation and research |
 
 ---
 
@@ -84,4 +85,10 @@ Read operations (`GET`) are open. The token is set via `AUTH_TOKEN` in `backend/
 | Query SMS | GET | `/api/query/sms` | No |
 | Query locations | GET | `/api/query/locations` | No |
 | Query health | GET | `/api/query/health` | No |
+| Browser instances | GET | `/api/browser` | Yes |
+| Create browser instance | POST | `/api/browser` | Yes |
+| Browser navigate | POST | `/api/browser/:id/navigate` | Yes |
+| Browser click/type/key/scroll | POST | `/api/browser/:id/{click|type|key|scroll}` | Yes |
+| Browser content/screenshot | POST | `/api/browser/:id/{content|screenshot}` | Yes |
+| Browser user handoff | POST | `/api/browser/:id/request-user-control` | Yes |
 | Send command | POST | `/api/command` | Yes |
