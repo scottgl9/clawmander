@@ -37,6 +37,7 @@ function createMockContext() {
     newPage: jest.fn().mockResolvedValue(mockPage),
     newCDPSession: jest.fn().mockResolvedValue(mockCdpSession),
     close: jest.fn().mockResolvedValue(undefined),
+    addInitScript: jest.fn().mockResolvedValue(undefined),
   };
 
   return { mockContext, mockPage, mockCdpSession };
@@ -85,6 +86,11 @@ describe('BrowserInstance', () => {
     const inst = new BrowserInstance('test-2', mocks.mockContext);
     await inst.init();
     expect(mocks.mockContext.newPage).toHaveBeenCalled();
+  });
+
+  test('init injects stealth script via addInitScript', async () => {
+    expect(mockContext.addInitScript).toHaveBeenCalledTimes(1);
+    expect(typeof mockContext.addInitScript.mock.calls[0][0]).toBe('function');
   });
 
   describe('viewer management', () => {
