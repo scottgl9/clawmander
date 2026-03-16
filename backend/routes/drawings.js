@@ -1,5 +1,5 @@
 const express = require('express');
-const { requireAuth } = require('../middleware/auth');
+const anyAuth = require('../middleware/anyAuth');
 
 module.exports = function (drawingService) {
   const router = express.Router();
@@ -17,20 +17,20 @@ module.exports = function (drawingService) {
   });
 
   // POST /api/drawings — create new drawing
-  router.post('/', requireAuth, (req, res) => {
+  router.post('/', anyAuth, (req, res) => {
     const drawing = drawingService.create(req.body);
     res.status(201).json(drawing);
   });
 
   // PATCH /api/drawings/:id — update drawing
-  router.patch('/:id', requireAuth, (req, res) => {
+  router.patch('/:id', anyAuth, (req, res) => {
     const drawing = drawingService.update(req.params.id, req.body);
     if (!drawing) return res.status(404).json({ error: 'Drawing not found' });
     res.json(drawing);
   });
 
   // DELETE /api/drawings/:id — delete drawing
-  router.delete('/:id', requireAuth, (req, res) => {
+  router.delete('/:id', anyAuth, (req, res) => {
     const removed = drawingService.delete(req.params.id);
     if (!removed) return res.status(404).json({ error: 'Drawing not found' });
     res.json({ success: true });
