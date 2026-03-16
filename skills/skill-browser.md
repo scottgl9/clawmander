@@ -3,14 +3,20 @@
 Drive a persistent headless browser via REST API. Use this for web research, form filling, monitoring, and any task that requires navigating real web pages. The user can see your browser activity in real-time on the Clawmander UI.
 
 **Base URL**: `http://localhost:3001`
-**Auth**: All endpoints require `Authorization: Bearer <AUTH_TOKEN>`
+**Auth**: Browser endpoints require auth via `anyAuth`:
+- `Authorization: Bearer <AUTH_TOKEN>` (agent token), or
+- `Authorization: Bearer <JWT_ACCESS_TOKEN>` (logged-in user token)
 
 ---
 
 ## Key Concepts
 
-- **Instances**: Each browser instance is an isolated Chromium process with its own cookies, localStorage, and session. Create one per task or reuse the `default` instance.
+- **Live viewer socket**: browser live-view/control is available at `ws://<host>/ws/browser/:id`.
+- **REST vs WS split**: use REST (`/api/browser/...`) for deterministic agent actions; use WS for interactive live control/observability.
+
+- **Instances**: Each browser instance is an isolated Chrome process with its own cookies, localStorage, and session. Create one per task or reuse the `default` instance.
 - **Persistent profiles**: Sessions survive restarts. Cookies and logins are preserved in `~/.openclaw/browser-profiles/<id>/`.
+- **Stealth mode**: The browser uses the system-installed Google Chrome with anti-detection patches (spoofed navigator properties, WebGL, Client Hints). Google search, Maps, and most sites work without CAPTCHA or robot detection.
 - **Control modes**: `shared` (default — both agent and user can interact), `agent` (user input blocked), `user` (agent has handed control to the user).
 - **Human-in-the-loop**: When you encounter a login page, CAPTCHA, or 2FA, call `request-user-control` to hand the browser to the user. The call blocks until the user clicks "Hand Back".
 
@@ -194,6 +200,17 @@ Content-Type: application/json
 
 Modes: `shared`, `agent`, `user`
 
+### WebSocket interactive actions (live panel)
+When connected to `ws://<host>/ws/browser/:id`, the frontend/live client can send:
+- `navigate` (`{ type:"navigate", url }`)
+- `back`, `forward`, `reload`
+- `click` (`x`,`y` normalized 0..1)
+- `type`, `key`
+- `scroll` (`x`,`y`,`delta`)
+- `mousemove`
+- `take-control`, `release-control`
+
+Use REST endpoints for scriptable agent workflows; use WS actions for user live steering.
 ### Request User Control (Blocking)
 
 **This is the key endpoint for human-in-the-loop.** Call this when you need the user to intervene (login, CAPTCHA, 2FA, manual selection). The request **blocks** until the user clicks "Hand Back to Agent" in the UI.
@@ -331,3 +348,5 @@ curl -s -X POST $BASE/api/browser/$ID/click \
 6. **Reuse instances** when working on the same site — cookies persist, so you stay logged in
 7. **Destroy instances** when done to free resources (max 5 concurrent)
 8. **Set control mode to `agent`** during multi-step automation to prevent user interference, then switch back to `shared` when idle
+9. **Google search works** — the browser has stealth anti-detection, so you can search Google directly without triggering CAPTCHA. Use `textarea[name=q]` as the search input selector
+10. **If you hit a CAPTCHA despite stealth** — call `request-user-control` with a reason like "Please solve the CAPTCHA" rather than retrying

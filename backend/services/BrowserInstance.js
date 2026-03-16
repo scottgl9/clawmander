@@ -15,12 +15,208 @@ class BrowserInstance {
     this._userControlTimeout = null;
     this.screencastOptions = options.screencast || { format: 'jpeg', quality: 60 };
     this.viewportSize = options.viewport || { width: 1280, height: 800 };
+    this.chromeVersion = options.chromeVersion || '146.0.7680.80';
+    this.chromeMajorVersion = options.chromeMajorVersion || '146';
   }
 
   async init() {
     const pages = this.context.pages();
     this.page = pages.length > 0 ? pages[0] : await this.context.newPage();
+
+    // Stealth: patch automation-detectable properties on every new page/navigation
+    await this.context.addInitScript(() => {
+      // Hide webdriver flag
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+
+      // Fake plugins array (headless has 0 plugins)
+      Object.defineProperty(navigator, 'plugins', {
+        get: () => {
+          const plugins = [
+            { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer', description: 'Portable Document Format', length: 1 },
+            { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', description: '', length: 1 },
+            { name: 'Native Client', filename: 'internal-nacl-plugin', description: '', length: 2 },
+          ];
+          plugins.refresh = () => {};
+          return plugins;
+        },
+      });
+
+      // Fake mimeTypes
+      Object.defineProperty(navigator, 'mimeTypes', {
+        get: () => {
+          const types = [
+            { type: 'application/pdf', suffixes: 'pdf', description: 'Portable Document Format', enabledPlugin: { name: 'Chrome PDF Plugin' } },
+            { type: 'application/x-google-chrome-pdf', suffixes: 'pdf', description: 'Portable Document Format', enabledPlugin: { name: 'Chrome PDF Viewer' } },
+          ];
+          return types;
+        },
+      });
+
+      Object.defineProperty(navigator, 'languages', {
+        get: () => ['en-US', 'en'],
+      });
+
+      // Ensure chrome object looks real
+      if (!window.chrome) window.chrome = {};
+      window.chrome.runtime = window.chrome.runtime || {};
+      // Stub chrome.runtime methods Google checks for
+      window.chrome.runtime.connect = window.chrome.runtime.connect || function () { return { onMessage: { addListener: () => {} }, postMessage: () => {}, onDisconnect: { addListener: () => {} } }; };
+      window.chrome.runtime.sendMessage = window.chrome.runtime.sendMessage || function (msg, cb) { if (cb) cb(); };
+      window.chrome.loadTimes = window.chrome.loadTimes || function () {
+        return { commitLoadTime: Date.now() / 1000, connectionInfo: 'h2', finishDocumentLoadTime: Date.now() / 1000, finishLoadTime: Date.now() / 1000, firstPaintAfterLoadTime: 0, firstPaintTime: Date.now() / 1000, navigationType: 'Other', npnNegotiatedProtocol: 'h2', requestTime: Date.now() / 1000, startLoadTime: Date.now() / 1000, wasAlternateProtocolAvailable: false, wasFetchedViaSpdy: true, wasNpnNegotiated: true };
+      };
+      window.chrome.csi = window.chrome.csi || function () {
+        return { onloadT: Date.now(), pageT: Date.now(), startE: Date.now(), tran: 15 };
+      };
+      window.chrome.app = window.chrome.app || { isInstalled: false, InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' }, RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' } };
+
+      // Fix permissions query
+      const originalQuery = window.navigator.permissions.query;
+      window.navigator.permissions.query = (parameters) =>
+        parameters.name === 'notifications'
+          ? Promise.resolve({ state: Notification.permission })
+          : originalQuery(parameters);
+
+      // Spoof WebGL vendor/renderer (headless uses SwiftShader — must match Linux platform)
+      const getParameterProto = WebGLRenderingContext.prototype.getParameter;
+      WebGLRenderingContext.prototype.getParameter = function (param) {
+        if (param === 37445) return 'Google Inc. (NVIDIA Corporation)';        // UNMASKED_VENDOR_WEBGL
+        if (param === 37446) return 'ANGLE (NVIDIA Corporation, NVIDIA GeForce GTX 1650/PCIe/SSE2, OpenGL 4.5)'; // UNMASKED_RENDERER_WEBGL
+        return getParameterProto.call(this, param);
+      };
+      const getParameterProto2 = WebGL2RenderingContext.prototype.getParameter;
+      WebGL2RenderingContext.prototype.getParameter = function (param) {
+        if (param === 37445) return 'Google Inc. (NVIDIA Corporation)';
+        if (param === 37446) return 'ANGLE (NVIDIA Corporation, NVIDIA GeForce GTX 1650/PCIe/SSE2, OpenGL 4.5)';
+        return getParameterProto2.call(this, param);
+      };
+
+      // Fake screen dimensions to look like a real 1080p desktop
+      Object.defineProperty(screen, 'width', { get: () => 1920 });
+      Object.defineProperty(screen, 'height', { get: () => 1080 });
+      Object.defineProperty(screen, 'availWidth', { get: () => 1920 });
+      Object.defineProperty(screen, 'availHeight', { get: () => 1053 }); // minus taskbar
+      Object.defineProperty(screen, 'colorDepth', { get: () => 24 });
+      Object.defineProperty(screen, 'pixelDepth', { get: () => 24 });
+
+      // Headless: outerHeight === innerHeight (no browser chrome) — dead giveaway
+      // Simulate a normal Chrome window with toolbar/tabs (~85px chrome)
+      Object.defineProperty(window, 'outerHeight', { get: () => window.innerHeight + 85 });
+      Object.defineProperty(window, 'outerWidth', { get: () => window.innerWidth });
+      // screenX/screenY should look like a positioned window
+      Object.defineProperty(window, 'screenX', { get: () => 0 });
+      Object.defineProperty(window, 'screenY', { get: () => 0 });
+
+      // Override hardwareConcurrency (headless often shows unusual values)
+      Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
+
+      // Override deviceMemory
+      Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
+
+      // Fake connection info
+      if (navigator.connection) {
+        Object.defineProperty(navigator.connection, 'rtt', { get: () => 50 });
+        Object.defineProperty(navigator.connection, 'downlink', { get: () => 10 });
+        Object.defineProperty(navigator.connection, 'effectiveType', { get: () => '4g' });
+      }
+
+      // Prevent Notification.permission from being "default" in headless
+      if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        Object.defineProperty(Notification, 'permission', { get: () => 'denied' });
+      }
+    });
+
     this.cdpSession = await this.context.newCDPSession(this.page);
+
+    // CDP-level stealth: runs before ANY page JS, even before addInitScript
+    await this.cdpSession.send('Page.addScriptToEvaluateOnNewDocument', {
+      source: `
+        // Remove Playwright-injected globals
+        delete window.__playwright;
+        delete window.__pw_manual;
+        delete window.__PW_inspect;
+
+        // Remove any cdc_ (ChromeDriver) properties from document
+        const cleanCdc = () => {
+          for (const prop of Object.getOwnPropertyNames(document)) {
+            if (prop.match(/^\\$cdc_|^cdc_|^__cdc/)) {
+              delete document[prop];
+            }
+          }
+        };
+        cleanCdc();
+
+        // Patch iframe contentWindow to hide webdriver in child contexts
+        const origHTMLIFrameElement = HTMLIFrameElement.prototype.__lookupGetter__('contentWindow');
+        if (origHTMLIFrameElement) {
+          Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', {
+            get: function () {
+              const w = origHTMLIFrameElement.call(this);
+              if (w) {
+                try { Object.defineProperty(w.navigator, 'webdriver', { get: () => undefined }); } catch {}
+              }
+              return w;
+            },
+          });
+        }
+
+        // Prevent toString detection of overridden functions
+        const nativeToString = Function.prototype.toString;
+        const overrides = new Map();
+        Function.prototype.toString = function () {
+          if (overrides.has(this)) return overrides.get(this);
+          return nativeToString.call(this);
+        };
+        overrides.set(Function.prototype.toString, 'function toString() { [native code] }');
+
+        // Prevent detection via error stack traces that reveal automation paths
+        const originalError = Error;
+        const patchedError = new Proxy(originalError, {
+          construct(target, args) {
+            const err = new target(...args);
+            if (err.stack) {
+              err.stack = err.stack.replace(/playwright|puppeteer|automation|headless/gi, '');
+            }
+            return err;
+          }
+        });
+        // Don't replace Error globally as it can break things, but patch stack on getters
+      `,
+    }).catch(() => {});
+
+    // Hide the Runtime domain enable that Playwright uses (leaks automation)
+    await this.cdpSession.send('Runtime.enable').catch(() => {});
+
+    // Override user-agent hints via CDP (Client Hints API — used by Google)
+    // All version strings derived from the actual installed Chrome binary
+    const ver = this.chromeVersion;
+    const major = this.chromeMajorVersion;
+    const realUA = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${ver} Safari/537.36`;
+    await this.cdpSession.send('Emulation.setUserAgentOverride', {
+      userAgent: realUA,
+      acceptLanguage: 'en-US,en;q=0.9',
+      platform: 'Linux',
+      userAgentMetadata: {
+        brands: [
+          { brand: 'Chromium', version: major },
+          { brand: 'Google Chrome', version: major },
+          { brand: 'Not=A?Brand', version: '24' },
+        ],
+        fullVersionList: [
+          { brand: 'Chromium', version: ver },
+          { brand: 'Google Chrome', version: ver },
+          { brand: 'Not=A?Brand', version: '24.0.0.0' },
+        ],
+        fullVersion: ver,
+        platform: 'Linux',
+        platformVersion: '6.11.0',
+        architecture: 'x86',
+        model: '',
+        mobile: false,
+        bitness: '64',
+        wow64: false,
+      },
+    }).catch(() => {});
 
     // Listen for page events
     this.page.on('load', () => {
