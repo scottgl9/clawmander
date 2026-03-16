@@ -6,10 +6,11 @@ All services share one Tailscale hostname (`scottgl-aipc.taile589de.ts.net`) wit
 
 | Service | Local port | nginx path |
 |---------|-----------|------------|
-| Clawmander frontend (Next.js) | 3000 | `/` |
+| Clawmander frontend (Next.js) | 3000 | `/` (HTTP only) |
 | Clawmander backend API | 3001 | `/api/` |
+| Clawmander backend WebSockets | 3001 | `/ws/` (terminal, browser) |
 | Clawmander SSE | 3001 | `/api/sse/` |
-| OpenClaw Gateway | 18789 | `/openclaw/` (Control UI) and `/` (WebSocket) |
+| OpenClaw Gateway | 18789 | `/openclaw/` (Control UI) and `/` (WebSocket upgrade) |
 | Matrix Synapse | 8008 | `/_matrix/`, `/_synapse/`, `/.well-known/matrix/` |
 
 ## Prerequisites
@@ -59,6 +60,25 @@ map $http_upgrade $root_backend {
 This means:
 - **Browser visiting `https://scottgl-aipc.taile589de.ts.net/`** → Clawmander frontend
 - **Android app connecting `wss://scottgl-aipc.taile589de.ts.net`** → OpenClaw Gateway
+
+### Backend WebSocket endpoints (`/ws/`)
+
+The Clawmander backend serves WebSocket endpoints at `/ws/terminal` and `/ws/browser/:id`.
+These must be explicitly routed to port 3001 — otherwise the root-path `map` above would
+send them to OpenClaw Gateway (since they're WebSocket upgrades).
+
+```nginx
+location /ws/ {
+    proxy_pass http://127.0.0.1:3001;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_read_timeout 3600;
+}
+```
 
 ### OpenClaw behind a basePath
 
@@ -162,6 +182,7 @@ tailscale serve status
 |---------|-------|-----|
 | All paths return OpenClaw UI | Tailscale Serve rule active | `sudo tailscale serve reset` |
 | Android app: 502 on WS | Missing `map` blocks in nginx | Redeploy `nginx-clawmander.conf` |
+| Terminal/Browser WS disconnects | `/ws/` block missing, WS goes to OpenClaw | Add `location /ws/` block routing to port 3001 |
 | OpenClaw logs `fwd=n/a` | `trustedProxies` not set or missing `X-Forwarded-Host` | Check gateway config + nginx headers |
 | OpenClaw rejects WS with `pairing required` | Device not paired, or origin not in `allowedOrigins` | Approve device: `openclaw devices approve <id>` |
 | Matrix returns 502 | Synapse not running on port 8008 | `sudo systemctl status matrix-synapse` |
