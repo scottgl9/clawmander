@@ -86,6 +86,17 @@ describe('BrowserManager', () => {
     expect(sse.broadcast).toHaveBeenCalledWith('browser.created', expect.any(Object));
   });
 
+  test('createInstance uses stealth launch args', async () => {
+    await manager.init();
+    await manager.createInstance('stealth-test');
+    const launchCall = playwright.chromium.launchPersistentContext.mock.calls[0];
+    const opts = launchCall[1];
+    expect(opts.headless).toBe(true);
+    expect(opts.ignoreDefaultArgs).toEqual(['--enable-automation']);
+    expect(opts.args).toContain('--disable-blink-features=AutomationControlled');
+    expect(opts.userAgent).toMatch(/Chrome\/146/);;
+  });
+
   test('createInstance rejects duplicate ID', async () => {
     await manager.init();
     await manager.createInstance('dup');

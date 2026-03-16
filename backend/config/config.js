@@ -27,5 +27,6 @@ module.exports = {
     profileDir: process.env.BROWSER_PROFILE_DIR || path.join(os.homedir(), '.openclaw', 'browser-profiles'),
     viewport: { width: 1280, height: 800 },
     screencast: { format: 'jpeg', quality: 60 },
+    userAgent: process.env.BROWSER_USER_AGENT || null,
   },
 };
