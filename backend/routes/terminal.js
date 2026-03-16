@@ -2,50 +2,54 @@ const { WebSocketServer } = require('ws');
 const { v4: uuidv4 } = require('uuid');
 
 function attachTerminalWS(httpServer, terminalService) {
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws/terminal' });
+  const wss = new WebSocketServer({ noServer: true });
 
-  wss.on('connection', (ws, req) => {
+  httpServer.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url, 'http://localhost');
-    const cols = parseInt(url.searchParams.get('cols')) || 80;
-    const rows = parseInt(url.searchParams.get('rows')) || 24;
-    const sessionId = uuidv4();
+    if (url.pathname !== '/ws/terminal') return;
 
-    const ptyProcess = terminalService.createSession(sessionId, cols, rows);
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      const cols = parseInt(url.searchParams.get('cols')) || 80;
+      const rows = parseInt(url.searchParams.get('rows')) || 24;
+      const sessionId = uuidv4();
 
-    ptyProcess.onData((data) => {
-      if (ws.readyState === ws.OPEN) {
-        ws.send(JSON.stringify({ type: 'output', data }));
-      }
-    });
+      const ptyProcess = terminalService.createSession(sessionId, cols, rows);
 
-    ptyProcess.onExit(({ exitCode }) => {
-      if (ws.readyState === ws.OPEN) {
-        ws.send(JSON.stringify({ type: 'exit', exitCode }));
-        ws.close();
-      }
-    });
+      ptyProcess.onData((data) => {
+        if (ws.readyState === ws.OPEN) {
+          ws.send(JSON.stringify({ type: 'output', data }));
+        }
+      });
 
-    ws.on('message', (raw) => {
-      let msg;
-      try {
-        msg = JSON.parse(raw);
-      } catch {
-        return;
-      }
+      ptyProcess.onExit(({ exitCode }) => {
+        if (ws.readyState === ws.OPEN) {
+          ws.send(JSON.stringify({ type: 'exit', exitCode }));
+          ws.close();
+        }
+      });
 
-      if (msg.type === 'input') {
-        terminalService.writeToSession(sessionId, msg.data);
-      } else if (msg.type === 'resize') {
-        terminalService.resizeSession(sessionId, msg.cols, msg.rows);
-      }
-    });
+      ws.on('message', (raw) => {
+        let msg;
+        try {
+          msg = JSON.parse(raw);
+        } catch {
+          return;
+        }
 
-    ws.on('close', () => {
-      terminalService.destroySession(sessionId);
-    });
+        if (msg.type === 'input') {
+          terminalService.writeToSession(sessionId, msg.data);
+        } else if (msg.type === 'resize') {
+          terminalService.resizeSession(sessionId, msg.cols, msg.rows);
+        }
+      });
 
-    ws.on('error', () => {
-      terminalService.destroySession(sessionId);
+      ws.on('close', () => {
+        terminalService.destroySession(sessionId);
+      });
+
+      ws.on('error', () => {
+        terminalService.destroySession(sessionId);
+      });
     });
   });
 
