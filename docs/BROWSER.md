@@ -10,7 +10,7 @@ A persistent, shared browser instance running on the gateway machine that both O
 
 ```
 Gateway machine (scottgl-aipc)
-  └── Chromium (headless, persistent profile)
+  └── System Chrome 146 (headless, persistent profile, stealth mode)
         ↕ CDP (Chrome DevTools Protocol)
   └── BrowserService (Node.js)
         ↕ WebSocket (/ws/browser)
@@ -20,7 +20,7 @@ Gateway machine (scottgl-aipc)
         └── <BrowserPanel> — live view, URL bar, mouse/keyboard passthrough
 ```
 
-The browser runs **headless but persistent** on the gateway. Its state (cookies, sessions, localStorage) survives across agent tasks. Agents can navigate and interact programmatically. The user can watch and take over at any time via the frontend panel.
+The browser runs **headless but persistent** on the gateway using the **system-installed Google Chrome** (not Playwright's bundled Chromium for Testing). Its state (cookies, sessions, localStorage) survives across agent tasks. Agents can navigate and interact programmatically — including Google search without triggering robot detection. The user can watch and take over at any time via the frontend panel.
 
 ---
 
@@ -52,7 +52,7 @@ The browser runs **headless but persistent** on the gateway. Its state (cookies,
 
 `backend/services/BrowserService.js`
 
-- Launches a **persistent Chromium instance** via Playwright with a named profile directory (survives restarts)
+- Launches a **persistent Chrome instance** via Playwright using the system-installed Google Chrome (`/usr/bin/google-chrome-stable`) with anti-detection stealth (falls back to bundled Chromium if system Chrome is unavailable)
 - Uses **CDP Page.startScreencast** for efficient JPEG frame streaming
 - Exposes a **control API** used by both agent tools and the WebSocket handler:
   - `navigate(url)`
@@ -156,10 +156,44 @@ These tools are registered as capabilities on agents that have browser access. O
 
 ## Session Persistence
 
-- Chromium runs with a **named user data directory** (`~/.openclaw/browser-profile/`)
+- Chrome runs with a **named user data directory** (`~/.openclaw/browser-profiles/<id>/`)
 - Cookies, localStorage, and logged-in sessions persist across gateway restarts
 - Profile is per-gateway-machine (not per-user — this is a single-user setup)
 - Optional: multiple named profiles for different identities/contexts
+
+---
+
+## Anti-Detection (Stealth Mode)
+
+The browser launches with comprehensive anti-detection measures so that sites like Google do not trigger CAPTCHA or robot verification:
+
+### Launch-level
+- **System Chrome binary** (`/usr/bin/google-chrome-stable`) instead of Playwright's "Chrome for Testing" which has a distinctive user-agent
+- `--disable-blink-features=AutomationControlled` — removes `navigator.webdriver = true`
+- `ignoreDefaultArgs: ['--enable-automation']` — prevents Playwright from adding automation markers
+- Explicit user-agent string matching real Chrome (e.g. `Chrome/146.0.0.0`)
+- Configurable via `BROWSER_USER_AGENT` env var
+
+### JavaScript injection (via `context.addInitScript`)
+- `navigator.webdriver` → `undefined`
+- `navigator.plugins` → realistic Chrome PDF Plugin, Chrome PDF Viewer, Native Client
+- `navigator.mimeTypes` → `application/pdf`, `application/x-google-chrome-pdf`
+- `navigator.languages` → `['en-US', 'en']`
+- `navigator.hardwareConcurrency` → `8`, `navigator.deviceMemory` → `8`
+- `window.chrome` → full `runtime`, `loadTimes()`, `csi()`, `app` object
+- `permissions.query` → patched for notifications
+- WebGL `UNMASKED_VENDOR/RENDERER` → spoofed to NVIDIA GPU (hides SwiftShader)
+- `screen.colorDepth` / `pixelDepth` → `24`
+
+### CDP-level (via `Page.addScriptToEvaluateOnNewDocument`)
+- Removes `__playwright` and `__pw_manual` window properties
+- Patches iframe `contentWindow` to also hide `navigator.webdriver`
+- Wraps `Function.prototype.toString` to prevent detection of overridden functions
+- `Emulation.setUserAgentOverride` with full **Client Hints metadata** (brands, platform, architecture, bitness)
+
+### Environment
+- `BROWSER_USER_AGENT` — override the default user-agent string (optional)
+- System Chrome is auto-detected via `which google-chrome-stable` (falls back to bundled Chromium)
 
 ---
 
@@ -235,7 +269,8 @@ frontend/
 ```
 backend:  playwright (already likely present), ws (already used)
 frontend: none (canvas API is native)
-system:   chromium-browser or chromium (apt) on the gateway machine
+system:   google-chrome-stable (apt) on the gateway machine (preferred for stealth)
+          falls back to Playwright's bundled Chromium if not available
 ```
 
 ---
