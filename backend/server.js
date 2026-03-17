@@ -13,7 +13,6 @@ const ServerStatusService = require('./services/ServerStatusService');
 const OpenClawCollector = require('./collectors/OpenClawCollector');
 const ChatGatewayClient = require('./services/ChatGatewayClient');
 const ChatService = require('./services/ChatService');
-const PersonaSyncService = require('./services/PersonaSyncService');
 const CronService = require('./services/CronService');
 const MemoryService = require('./services/MemoryService');
 const DrawingService = require('./services/DrawingService');
@@ -54,7 +53,6 @@ const actionItemService = new ActionItemService(sseManager);
 const serverStatusService = new ServerStatusService(sseManager);
 const chatGatewayClient = new ChatGatewayClient(sseManager, taskService);
 const chatService = new ChatService(chatGatewayClient);
-const personaSyncService = new PersonaSyncService();
 const authDB = new AuthDB();
 const cronService = new CronService(sseManager, config.openClawHome, taskService);
 const memoryService = new MemoryService();
@@ -74,7 +72,7 @@ sseManager.broadcast = function (event, data) {
 };
 
 // Routes
-mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService, cronService, memoryService, drawingService, config, authDB, browserManager });
+mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, cronService, memoryService, drawingService, config, authDB, browserManager });
 
 // Health check
 app.get('/api/health', (req, res) => {

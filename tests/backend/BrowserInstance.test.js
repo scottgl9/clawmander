@@ -4,6 +4,7 @@ function createMockContext() {
   const mockCdpSession = {
     send: jest.fn().mockResolvedValue({}),
     on: jest.fn(),
+    removeListener: jest.fn(),
     removeAllListeners: jest.fn(),
     detach: jest.fn().mockResolvedValue(undefined),
   };
@@ -38,6 +39,7 @@ function createMockContext() {
     newCDPSession: jest.fn().mockResolvedValue(mockCdpSession),
     close: jest.fn().mockResolvedValue(undefined),
     addInitScript: jest.fn().mockResolvedValue(undefined),
+    on: jest.fn(),
   };
 
   return { mockContext, mockPage, mockCdpSession };
@@ -239,6 +241,8 @@ describe('BrowserInstance', () => {
         viewers: 0,
         lastActivity: expect.any(Number),
         viewport: { width: 1280, height: 800 },
+        pages: [{ id: 'page-0', url: 'about:blank', title: '', isActive: true }],
+        activePageId: 'page-0',
       });
     });
   });

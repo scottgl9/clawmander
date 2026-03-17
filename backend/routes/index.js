@@ -8,7 +8,6 @@ const activityRoutes = require('./activity');
 const sseRoutes = require('./sse');
 const serverRoutes = require('./server');
 const chatRoutes = require('./chat');
-const personaSyncRoutes = require('./personasync');
 const cronRoutes = require('./cron');
 const feedsRoutes = require('./feeds');
 const memoryRoutes = require('./memory');
@@ -18,7 +17,7 @@ const authRoutes = require('./auth');
 const { browserRoutes } = require('./browser');
 
 module.exports = function mountRoutes(app, services) {
-  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, personaSyncService, cronService, memoryService, drawingService, config, authDB, browserManager } = services;
+  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, cronService, memoryService, drawingService, config, authDB, browserManager } = services;
 
   // Auth routes (no auth required — handles its own)
   app.use('/api/auth', authRoutes(authDB, config));
@@ -44,7 +43,6 @@ module.exports = function mountRoutes(app, services) {
   app.use('/api/sse', sseRoutes(sseManager));
   app.use('/api/server', serverRoutes(serverStatusService));
   app.use('/api/chat', chatRoutes(chatGatewayClient, chatService));
-  app.use('/api', personaSyncRoutes(personaSyncService));
   app.use('/api/cron', cronRoutes(cronService));
   app.use('/api/feeds', feedsRoutes(cronService));
   app.use('/api/memory', memoryRoutes(memoryService));
