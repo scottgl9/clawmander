@@ -1,5 +1,7 @@
 const express = require('express');
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const workRoutes = require('../../backend/routes/work');
 
 function createTestApp(actionItemService) {
@@ -124,18 +126,38 @@ describe('Work Routes - Action Items', () => {
   });
 
   test('GET /api/work/brief priorities have title and details', async () => {
-    const svc = mockService();
-    const app = createTestApp(svc);
-    const res = await request(app, '/api/work/brief');
+    // Seed a brief for today so the route returns priorities
+    const briefPath = path.join(__dirname, '../../backend/storage/data/daily-brief.json');
+    const today = new Date().toISOString().split('T')[0];
+    const seededBrief = [{
+      id: 'test-brief',
+      date: today,
+      summary: 'Test brief',
+      priorities: [
+        { title: 'Review configs', details: 'Audit heartbeat intervals for all agents.' },
+        { title: 'Update resume', details: 'Add recent project experience.' },
+      ],
+      blockers: [],
+    }];
+    fs.writeFileSync(briefPath, JSON.stringify(seededBrief, null, 2));
 
-    expect(res.body.priorities.length).toBeGreaterThan(0);
-    for (const p of res.body.priorities) {
-      expect(p).toHaveProperty('title');
-      expect(p).toHaveProperty('details');
-      expect(typeof p.title).toBe('string');
-      expect(typeof p.details).toBe('string');
-      expect(p.title.length).toBeGreaterThan(0);
-      expect(p.details.length).toBeGreaterThan(0);
+    try {
+      const svc = mockService();
+      const app = createTestApp(svc);
+      const res = await request(app, '/api/work/brief');
+
+      expect(res.body.priorities.length).toBeGreaterThan(0);
+      for (const p of res.body.priorities) {
+        expect(p).toHaveProperty('title');
+        expect(p).toHaveProperty('details');
+        expect(typeof p.title).toBe('string');
+        expect(typeof p.details).toBe('string');
+        expect(p.title.length).toBeGreaterThan(0);
+        expect(p.details.length).toBeGreaterThan(0);
+      }
+    } finally {
+      // Clean up seeded file
+      fs.unlinkSync(briefPath);
     }
   });
 });

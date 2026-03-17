@@ -28,7 +28,6 @@ Read operations (`GET`) are open. The token is set via `AUTH_TOKEN` in `backend/
 | Chat Gateway | [skills/skill-chat.md](skills/skill-chat.md) | Send messages to agents via gateway |
 | Dashboard Views | [skills/skill-views.md](skills/skill-views.md) | Aggregated daily/weekly/monthly views, activity log |
 | System & Events | [skills/skill-system.md](skills/skill-system.md) | Health checks, SSE real-time events, commands |
-| PersonaSync | [skills/skill-personasync.md](skills/skill-personasync.md) | Sync and query phone data |
 | Virtual Browser | [skills/skill-browser.md](skills/skill-browser.md) | Control persistent Chrome instances for web automation and research |
 
 ---
@@ -72,23 +71,9 @@ Read operations (`GET`) are open. The token is set via `AUTH_TOKEN` in `backend/
 | Daily view | GET | `/api/views/daily` | No |
 | Weekly view | GET | `/api/views/weekly` | No |
 | Monthly view | GET | `/api/views/monthly` | No |
-| Sync SMS | POST | `/api/sync/sms` | Yes |
-| Sync calendar | POST | `/api/sync/calendar` | Yes |
-| Sync health | POST | `/api/sync/health` | Yes |
-| Sync location | POST | `/api/sync/location` | Yes |
-| Sync contacts | POST | `/api/sync/contacts` | Yes |
-| Sync call logs | POST | `/api/sync/call-logs` | Yes |
-| Sync app usage | POST | `/api/sync/app-usage` | Yes |
-| Sync media | POST | `/api/sync/media` | Yes |
-| Query summary | GET | `/api/query/summary` | No |
-| Query counts | GET | `/api/query/counts` | No |
-| Query SMS | GET | `/api/query/sms` | No |
-| Query locations | GET | `/api/query/locations` | No |
-| Query health | GET | `/api/query/health` | No |
 | Browser instances | GET | `/api/browser` | Yes |
 | Create browser instance | POST | `/api/browser` | Yes |
 | Browser navigate | POST | `/api/browser/:id/navigate` | Yes |
 | Browser click/type/key/scroll | POST | `/api/browser/:id/{click|type|key|scroll}` | Yes |
 | Browser content/screenshot | POST | `/api/browser/:id/{content|screenshot}` | Yes |
 | Browser user handoff | POST | `/api/browser/:id/request-user-control` | Yes |
-| Send command | POST | `/api/command` | Yes |

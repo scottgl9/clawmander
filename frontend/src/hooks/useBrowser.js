@@ -14,6 +14,8 @@ export default function useBrowser(instanceId, canvasRef) {
   const [controlMode, setControlMode] = useState('shared');
   const [agentMessage, setAgentMessage] = useState(null);
   const [viewportSize, setViewportSize] = useState({ width: 1280, height: 800 });
+  const [pages, setPages] = useState([]);
+  const [activePageId, setActivePageId] = useState(null);
 
   const connect = useCallback(() => {
     if (!mountedRef.current || !instanceId) return;
@@ -63,11 +65,18 @@ export default function useBrowser(instanceId, canvasRef) {
           setTitle(msg.title || '');
           setControlMode(msg.controlMode || 'shared');
           if (msg.viewport) setViewportSize(msg.viewport);
+          if (msg.pages) setPages(msg.pages);
+          if (msg.activePageId) setActivePageId(msg.activePageId);
           break;
         case 'meta':
           setUrl(msg.url || '');
           setTitle(msg.title || '');
           if (msg.controlMode) setControlMode(msg.controlMode);
+          if (msg.pages) setPages(msg.pages);
+          break;
+        case 'pages-updated':
+          setPages(msg.pages || []);
+          setActivePageId(msg.activePageId || null);
           break;
         case 'control':
           setControlMode(msg.mode);
@@ -127,6 +136,8 @@ export default function useBrowser(instanceId, canvasRef) {
     setAgentMessage(null);
     sendJSON({ type: 'release-control' });
   }, [sendJSON]);
+  const switchPage = useCallback((pageId) => sendJSON({ type: 'switch-page', pageId }), [sendJSON]);
+  const closePage = useCallback((pageId) => sendJSON({ type: 'close-page', pageId }), [sendJSON]);
 
   return {
     status,
@@ -135,6 +146,8 @@ export default function useBrowser(instanceId, canvasRef) {
     controlMode,
     agentMessage,
     viewportSize,
+    pages,
+    activePageId,
     navigate,
     goBack,
     goForward,
@@ -146,5 +159,7 @@ export default function useBrowser(instanceId, canvasRef) {
     sendMouseMove,
     takeControl,
     releaseControl,
+    switchPage,
+    closePage,
   };
 }
