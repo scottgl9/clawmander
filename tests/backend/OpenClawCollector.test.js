@@ -46,6 +46,7 @@ function mockTaskService() {
     upsert: jest.fn().mockReturnValue({ task: { id: 'task-1' }, created: true }),
     getAll: jest.fn().mockReturnValue([]),
     update: jest.fn().mockReturnValue({ id: 'task-1', status: 'done' }),
+    cleanupDoneTasks: jest.fn(),
   };
 }
 
@@ -151,8 +152,8 @@ describe('OpenClawCollector', () => {
       expect(frame.type).toBe('req');
       expect(frame.method).toBe('connect');
       expect(frame.id).toBeDefined();
-      expect(frame.params.client.id).toBe('cli');
-      expect(frame.params.client.mode).toBe('cli');
+      expect(frame.params.client.id).toBe('gateway-client');
+      expect(frame.params.client.mode).toBe('backend');
       expect(frame.params.role).toBe('operator');
       expect(frame.params.scopes).toEqual(['operator.read']);
       expect(frame.params.auth).toBeDefined();

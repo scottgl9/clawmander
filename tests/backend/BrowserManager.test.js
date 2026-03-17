@@ -91,10 +91,11 @@ describe('BrowserManager', () => {
     await manager.createInstance('stealth-test');
     const launchCall = playwright.chromium.launchPersistentContext.mock.calls[0];
     const opts = launchCall[1];
-    expect(opts.headless).toBe(true);
-    expect(opts.ignoreDefaultArgs).toEqual(['--enable-automation']);
+    expect(opts.headless).toBe(false);  // uses --headless=new via args instead
+    expect(opts.ignoreDefaultArgs).toEqual(['--enable-automation', '--enable-blink-features=IdleDetection']);
+    expect(opts.args).toContain('--headless=new');
     expect(opts.args).toContain('--disable-blink-features=AutomationControlled');
-    expect(opts.userAgent).toMatch(/Chrome\/146/);;
+    expect(opts.userAgent).toMatch(/Chrome\/146/);
   });
 
   test('createInstance rejects duplicate ID', async () => {
