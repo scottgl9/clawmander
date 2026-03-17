@@ -245,6 +245,12 @@ function attachBrowserWS(httpServer, browserManager) {
               msg.y * instance.viewportSize.height,
             ).catch(() => {});
             break;
+          case 'switch-page':
+            instance.switchPage(msg.pageId).catch(() => {});
+            break;
+          case 'close-page':
+            instance.closePage(msg.pageId).catch(() => {});
+            break;
           case 'take-control':
             instance.setControlMode('user');
             break;

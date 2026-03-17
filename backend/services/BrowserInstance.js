@@ -17,11 +17,16 @@ class BrowserInstance {
     this.viewportSize = options.viewport || { width: 1280, height: 800 };
     this.chromeVersion = options.chromeVersion || '146.0.7680.80';
     this.chromeMajorVersion = options.chromeMajorVersion || '146';
+
+    // Multi-page (popup/tab) support
+    this.pages = new Map();       // pageId -> { page, cdpSession }
+    this.activePageId = null;
+    this._pageCounter = 0;
   }
 
   async init() {
-    const pages = this.context.pages();
-    this.page = pages.length > 0 ? pages[0] : await this.context.newPage();
+    const existingPages = this.context.pages();
+    this.page = existingPages.length > 0 ? existingPages[0] : await this.context.newPage();
 
     // Stealth: patch automation-detectable properties on every new page/navigation
     await this.context.addInitScript(() => {
@@ -127,9 +132,57 @@ class BrowserInstance {
     });
 
     this.cdpSession = await this.context.newCDPSession(this.page);
+    await this._applyStealthCDP(this.cdpSession);
 
+    // Register initial page
+    const initialPageId = 'page-0';
+    this.pages.set(initialPageId, { page: this.page, cdpSession: this.cdpSession });
+    this.activePageId = initialPageId;
+
+    // Attach page event listeners
+    this._attachPageListeners(this.page);
+
+    // Listen for popup / new-tab pages
+    this.context.on('page', async (newPage) => {
+      const pageId = `page-${++this._pageCounter}`;
+      await newPage.waitForLoadState('domcontentloaded').catch(() => {});
+
+      const cdp = await this.context.newCDPSession(newPage);
+      await this._applyStealthCDP(cdp);
+
+      this.pages.set(pageId, { page: newPage, cdpSession: cdp });
+      this._attachPageListeners(newPage);
+
+      // Auto-cleanup when popup closes
+      newPage.on('close', () => {
+        const closing = this.pages.get(pageId);
+        if (!closing) return;
+        if (closing.cdpSession) closing.cdpSession.detach().catch(() => {});
+        this.pages.delete(pageId);
+
+        // If the active page was closed, switch to another
+        if (this.activePageId === pageId) {
+          const remaining = Array.from(this.pages.keys());
+          if (remaining.length > 0) {
+            this.switchPage(remaining[remaining.length - 1]);
+          }
+        }
+        this._broadcastPagesUpdated();
+      });
+
+      // Auto-switch to the new popup
+      await this.switchPage(pageId);
+      this._broadcastPagesUpdated();
+    });
+
+    return this;
+  }
+
+  // --- CDP Stealth (extracted for reuse on popups) ---
+
+  async _applyStealthCDP(cdpSession) {
     // CDP-level stealth: runs before ANY page JS, even before addInitScript
-    await this.cdpSession.send('Page.addScriptToEvaluateOnNewDocument', {
+    await cdpSession.send('Page.addScriptToEvaluateOnNewDocument', {
       source: `
         // Remove Playwright-injected globals
         delete window.__playwright;
@@ -185,14 +238,13 @@ class BrowserInstance {
     }).catch(() => {});
 
     // Hide the Runtime domain enable that Playwright uses (leaks automation)
-    await this.cdpSession.send('Runtime.enable').catch(() => {});
+    await cdpSession.send('Runtime.enable').catch(() => {});
 
     // Override user-agent hints via CDP (Client Hints API — used by Google)
-    // All version strings derived from the actual installed Chrome binary
     const ver = this.chromeVersion;
     const major = this.chromeMajorVersion;
     const realUA = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${ver} Safari/537.36`;
-    await this.cdpSession.send('Emulation.setUserAgentOverride', {
+    await cdpSession.send('Emulation.setUserAgentOverride', {
       userAgent: realUA,
       acceptLanguage: 'en-US,en;q=0.9',
       platform: 'Linux',
@@ -217,21 +269,105 @@ class BrowserInstance {
         wow64: false,
       },
     }).catch(() => {});
+  }
 
-    // Listen for page events
-    this.page.on('load', () => {
-      this._broadcastMeta();
-      this.emitter.emit('page-loaded', { url: this.page.url(), title: '' });
-    });
+  // --- Page event listeners (extracted for reuse on popups) ---
 
-    this.page.on('framenavigated', (frame) => {
-      if (frame === this.page.mainFrame()) {
+  _attachPageListeners(page) {
+    page.on('load', () => {
+      // Only broadcast meta if this is the active page
+      if (this._getPageId(page) === this.activePageId) {
         this._broadcastMeta();
-        this.emitter.emit('url-changed', { url: this.page.url() });
+        this.emitter.emit('page-loaded', { url: page.url(), title: '' });
       }
     });
 
-    return this;
+    page.on('framenavigated', (frame) => {
+      if (frame === page.mainFrame() && this._getPageId(page) === this.activePageId) {
+        this._broadcastMeta();
+        this.emitter.emit('url-changed', { url: page.url() });
+      }
+    });
+  }
+
+  _getPageId(page) {
+    for (const [id, entry] of this.pages) {
+      if (entry.page === page) return id;
+    }
+    return null;
+  }
+
+  // --- Multi-page management ---
+
+  getPages() {
+    const result = [];
+    for (const [id, entry] of this.pages) {
+      let url = 'about:blank';
+      let title = '';
+      try {
+        url = entry.page.url();
+        // title is async but we want sync — use url-based fallback
+      } catch {}
+      result.push({ id, url, title, isActive: id === this.activePageId });
+    }
+    return result;
+  }
+
+  async switchPage(pageId) {
+    const entry = this.pages.get(pageId);
+    if (!entry) return;
+
+    // Stop screencast on old CDP session
+    if (this.screencastActive) {
+      await this.cdpSession.send('Page.stopScreencast').catch(() => {});
+      this.cdpSession.removeAllListeners('Page.screencastFrame');
+      this.screencastActive = false;
+    }
+
+    // Switch references
+    this.page = entry.page;
+    this.cdpSession = entry.cdpSession;
+    this.activePageId = pageId;
+
+    // Restart screencast on new page if we have viewers
+    if (this.viewers.size > 0) {
+      await this.startScreencast();
+    }
+
+    this._broadcastMeta();
+    this._broadcastPagesUpdated();
+  }
+
+  async closePage(pageId) {
+    if (this.pages.size <= 1) return; // Don't close the last page
+
+    const entry = this.pages.get(pageId);
+    if (!entry) return;
+
+    // If closing the active page, switch first
+    if (this.activePageId === pageId) {
+      const remaining = Array.from(this.pages.keys()).filter(id => id !== pageId);
+      if (remaining.length > 0) {
+        await this.switchPage(remaining[remaining.length - 1]);
+      }
+    }
+
+    // Detach CDP and close
+    if (entry.cdpSession) {
+      await entry.cdpSession.detach().catch(() => {});
+    }
+    await entry.page.close().catch(() => {});
+    this.pages.delete(pageId);
+
+    this._broadcastPagesUpdated();
+  }
+
+  _broadcastPagesUpdated() {
+    this._broadcastJSON({
+      type: 'pages-updated',
+      pages: this.getPages(),
+      activePageId: this.activePageId,
+    });
   }
 
   // --- Viewer Management ---
@@ -245,6 +381,8 @@ class BrowserInstance {
       title: '',
       controlMode: this.controlMode,
       viewport: this.viewportSize,
+      pages: this.getPages(),
+      activePageId: this.activePageId,
     });
 
     this.viewers.add(ws);
@@ -262,22 +400,25 @@ class BrowserInstance {
 
   // --- Screencast ---
 
+  _onScreencastFrame(params) {
+    const buffer = Buffer.from(params.data, 'base64');
+    for (const ws of this.viewers) {
+      if (ws.readyState === 1) { // WebSocket.OPEN
+        ws.send(buffer);
+      }
+    }
+    // Acknowledge the frame
+    this.cdpSession.send('Page.screencastFrameAck', {
+      sessionId: params.sessionId,
+    }).catch(() => {});
+  }
+
   async startScreencast() {
     if (this.screencastActive) return;
     this.screencastActive = true;
 
-    this.cdpSession.on('Page.screencastFrame', (params) => {
-      const buffer = Buffer.from(params.data, 'base64');
-      for (const ws of this.viewers) {
-        if (ws.readyState === 1) { // WebSocket.OPEN
-          ws.send(buffer);
-        }
-      }
-      // Acknowledge the frame
-      this.cdpSession.send('Page.screencastFrameAck', {
-        sessionId: params.sessionId,
-      }).catch(() => {});
-    });
+    this._boundScreencastFrame = this._onScreencastFrame.bind(this);
+    this.cdpSession.on('Page.screencastFrame', this._boundScreencastFrame);
 
     await this.cdpSession.send('Page.startScreencast', {
       format: this.screencastOptions.format,
@@ -295,7 +436,10 @@ class BrowserInstance {
     this.screencastActive = false;
 
     await this.cdpSession.send('Page.stopScreencast').catch(() => {});
-    this.cdpSession.removeAllListeners('Page.screencastFrame');
+    if (this._boundScreencastFrame) {
+      this.cdpSession.removeListener('Page.screencastFrame', this._boundScreencastFrame);
+      this._boundScreencastFrame = null;
+    }
   }
 
   // --- Navigation & Interaction ---
@@ -451,6 +595,7 @@ class BrowserInstance {
       url: this.page.url(),
       title: '',
       controlMode: this.controlMode,
+      pages: this.getPages(),
     };
     this._broadcastJSON(meta);
   }
@@ -478,6 +623,8 @@ class BrowserInstance {
       viewers: this.viewers.size,
       lastActivity: this.lastActivity,
       viewport: this.viewportSize,
+      pages: this.getPages(),
+      activePageId: this.activePageId,
     };
   }
 
@@ -496,9 +643,14 @@ class BrowserInstance {
       this._userControlResolve = null;
     }
 
-    if (this.cdpSession) {
-      await this.cdpSession.detach().catch(() => {});
+    // Detach all CDP sessions
+    for (const [, entry] of this.pages) {
+      if (entry.cdpSession) {
+        await entry.cdpSession.detach().catch(() => {});
+      }
     }
+    this.pages.clear();
+
     await this.context.close().catch(() => {});
     this.emitter.removeAllListeners();
   }

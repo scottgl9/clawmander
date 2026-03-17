@@ -15,6 +15,7 @@ export default function BrowserPanel({ instanceId }) {
   const hiddenInputRef = useRef(null);
   const [urlInput, setUrlInput] = useState('');
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [keyboardActive, setKeyboardActive] = useState(false);
 
   const {
     status,
@@ -33,6 +34,10 @@ export default function BrowserPanel({ instanceId }) {
     sendMouseMove,
     takeControl,
     releaseControl,
+    pages,
+    activePageId,
+    switchPage,
+    closePage,
   } = useBrowser(instanceId, canvasRef);
 
   // Sync URL bar with actual URL
@@ -90,10 +95,6 @@ export default function BrowserPanel({ instanceId }) {
   const handleCanvasClick = useCallback((e) => {
     const { x, y } = getNormalizedCoords(e);
     sendClick(x, y);
-    // Focus hidden input to enable mobile keyboard
-    if (hiddenInputRef.current) {
-      hiddenInputRef.current.focus();
-    }
   }, [getNormalizedCoords, sendClick]);
 
   // Touch support for mobile
@@ -106,10 +107,6 @@ export default function BrowserPanel({ instanceId }) {
     const x = (touch.clientX - rect.left) / rect.width;
     const y = (touch.clientY - rect.top) / rect.height;
     sendClick(x, y);
-    // Focus hidden input for mobile keyboard
-    if (hiddenInputRef.current) {
-      hiddenInputRef.current.focus();
-    }
   }, [sendClick]);
 
   const handleCanvasWheel = useCallback((e) => {
@@ -207,9 +204,15 @@ export default function BrowserPanel({ instanceId }) {
 
         {/* Keyboard toggle for mobile */}
         <button
-          onClick={() => hiddenInputRef.current?.focus()}
-          className="p-1.5 rounded text-gray-400 hover:text-white hover:bg-surface-lighter transition-colors sm:hidden"
-          title="Open Keyboard"
+          onClick={() => {
+            if (keyboardActive) {
+              hiddenInputRef.current?.blur();
+            } else {
+              hiddenInputRef.current?.focus();
+            }
+          }}
+          className={`p-1.5 rounded hover:text-white hover:bg-surface-lighter transition-colors sm:hidden ${keyboardActive ? 'text-blue-400' : 'text-gray-400'}`}
+          title={keyboardActive ? 'Hide Keyboard' : 'Show Keyboard'}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <rect x="2" y="4" width="20" height="14" rx="2" />
@@ -227,6 +230,38 @@ export default function BrowserPanel({ instanceId }) {
         </span>
       </div>
 
+      {/* Page tab bar — shown when multiple pages exist */}
+      {pages.length > 1 && (
+        <div className="flex items-center gap-0.5 px-2 py-1 border-b border-gray-800 bg-surface-light overflow-x-auto scrollbar-none">
+          {pages.map((pg) => {
+            const label = pg.title || (() => { try { return new URL(pg.url).hostname; } catch { return pg.url || 'New Tab'; } })();
+            const isActive = pg.id === activePageId;
+            return (
+              <div
+                key={pg.id}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-xs cursor-pointer shrink-0 max-w-[160px] transition-colors ${
+                  isActive ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40' : 'text-gray-400 hover:text-gray-200 hover:bg-surface-lighter'
+                }`}
+                onClick={() => switchPage(pg.id)}
+              >
+                <span className="truncate">{label}</span>
+                {pages.length > 1 && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); closePage(pg.id); }}
+                    className="ml-0.5 text-gray-500 hover:text-red-400 transition-colors shrink-0"
+                    title="Close tab"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Agent message banner */}
       <AgentMessageBanner message={agentMessage} onRelease={releaseControl} />
 
@@ -240,8 +275,9 @@ export default function BrowserPanel({ instanceId }) {
         spellCheck="false"
         onInput={handleHiddenInput}
         onKeyDown={handleKeyDown}
-        className="absolute opacity-0 w-0 h-0 pointer-events-none"
-        style={{ position: 'absolute', top: -9999, left: -9999 }}
+        onFocus={() => setKeyboardActive(true)}
+        onBlur={() => setKeyboardActive(false)}
+        style={{ position: 'fixed', bottom: 0, left: 0, width: 1, height: 1, opacity: 0.01 }}
         tabIndex={-1}
       />
 
