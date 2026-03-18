@@ -103,6 +103,8 @@ class BrowserManager {
         '--disable-ipc-flooding-protection',
         '--disable-backgrounding-occluded-windows',
         '--disable-renderer-backgrounding',
+        // Auth-flow compatibility: allow third-party cookies for OAuth popups
+        '--disable-features=SameSiteByDefaultCookies,CookiesWithoutSameSiteMustBeSecure,FedCm',
       ],
       ignoreDefaultArgs: ['--enable-automation', '--enable-blink-features=IdleDetection'],
     };
@@ -134,6 +136,9 @@ class BrowserManager {
     });
     instance.emitter.on('control-changed', (data) => {
       this.sseManager.broadcast('browser.control_changed', { id, ...data });
+    });
+    instance.emitter.on('popup-opened', (data) => {
+      this.sseManager.broadcast('browser.popup_opened', { id, ...data });
     });
 
     this.instances.set(id, instance);

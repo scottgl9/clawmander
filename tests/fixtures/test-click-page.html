@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Click Test Page</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    .btn { padding: 10px 20px; margin: 10px; cursor: pointer; }
+    #overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5); display: none; z-index: 100;
+    }
+    #overlay.active { display: flex; align-items: center; justify-content: center; }
+    #overlay button { padding: 20px 40px; font-size: 18px; }
+    #result { margin: 20px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>Click Test Page</h1>
+
+  <button id="simple-btn" class="btn" role="button">Click Me</button>
+  <button id="submit-btn" class="btn" role="button" name="submit">Submit Form</button>
+  <a id="link" href="#clicked">Navigate Link</a>
+
+  <div id="overlay">
+    <button id="overlay-btn" role="button">Confirm</button>
+  </div>
+
+  <button id="show-overlay" class="btn" onclick="document.getElementById('overlay').classList.add('active')">
+    Show Overlay
+  </button>
+
+  <iframe id="test-iframe" srcdoc="<button id='iframe-btn'>Inside Frame</button>" width="300" height="100"></iframe>
+
+  <div id="result"></div>
+
+  <script>
+    document.getElementById('simple-btn').addEventListener('click', () => {
+      document.getElementById('result').textContent = 'simple-btn clicked';
+    });
+    document.getElementById('submit-btn').addEventListener('click', () => {
+      document.getElementById('result').textContent = 'submit-btn clicked';
+    });
+    document.getElementById('overlay-btn').addEventListener('click', () => {
+      document.getElementById('result').textContent = 'overlay-btn clicked';
+      document.getElementById('overlay').classList.remove('active');
+    });
+  </script>
+</body>
+</html>
