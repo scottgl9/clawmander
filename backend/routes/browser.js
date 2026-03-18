@@ -150,6 +150,56 @@ function browserRoutes(browserManager) {
     }
   });
 
+  // Smart click (selector/role/text-based)
+  router.post('/:id/click-selector', anyAuth, async (req, res) => {
+    const instance = browserManager.getInstance(req.params.id);
+    if (!instance) return res.status(404).json({ error: 'Instance not found' });
+    try {
+      const result = await instance.clickSmart(req.body);
+      res.json(result);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Keyboard action (tab-enter, focus-type)
+  router.post('/:id/keyboard-action', anyAuth, async (req, res) => {
+    const instance = browserManager.getInstance(req.params.id);
+    if (!instance) return res.status(404).json({ error: 'Instance not found' });
+    try {
+      const { action } = req.body;
+      if (action === 'tab-enter') {
+        await instance.tabAndEnter(req.body.tabCount || 1);
+      } else if (action === 'focus-type') {
+        await instance.focusAndType(req.body.selector, req.body.text);
+      } else {
+        return res.status(400).json({ error: `Unknown keyboard action: ${action}` });
+      }
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // List pages / tabs
+  router.get('/:id/pages', anyAuth, (req, res) => {
+    const instance = browserManager.getInstance(req.params.id);
+    if (!instance) return res.status(404).json({ error: 'Instance not found' });
+    res.json(instance.getPages());
+  });
+
+  // Activate a specific page / tab
+  router.post('/:id/pages/:pageId/activate', anyAuth, async (req, res) => {
+    const instance = browserManager.getInstance(req.params.id);
+    if (!instance) return res.status(404).json({ error: 'Instance not found' });
+    try {
+      await instance.switchPage(req.params.pageId);
+      res.json({ ok: true, activePageId: req.params.pageId });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   // Set control mode
   router.post('/:id/control', anyAuth, async (req, res) => {
     const instance = browserManager.getInstance(req.params.id);
@@ -200,9 +250,14 @@ function attachBrowserWS(httpServer, browserManager) {
           return;
         }
 
-        // Drop user input if control mode is 'agent'
+        // Block user input if control mode is 'agent' — send explicit error
         if (instance.controlMode === 'agent') {
           if (['click', 'type', 'key', 'scroll', 'mousemove'].includes(msg.type)) {
+            instance._sendJSON(ws, {
+              type: 'input-blocked',
+              reason: 'Control mode is agent',
+              mode: instance.controlMode,
+            });
             return;
           }
         }
@@ -224,7 +279,9 @@ function attachBrowserWS(httpServer, browserManager) {
             instance.click(
               msg.x * instance.viewportSize.width,
               msg.y * instance.viewportSize.height,
-            ).catch(() => {});
+            ).then((result) => {
+              instance._sendJSON(ws, { type: 'click-ack', ...result });
+            }).catch(() => {});
             break;
           case 'type':
             instance.type(msg.text).catch(() => {});
@@ -244,6 +301,18 @@ function attachBrowserWS(httpServer, browserManager) {
               msg.x * instance.viewportSize.width,
               msg.y * instance.viewportSize.height,
             ).catch(() => {});
+            break;
+          case 'click-selector':
+            instance.clickSmart(msg).then((result) => {
+              instance._sendJSON(ws, { type: 'click-selector-ack', ...result });
+            }).catch(() => {});
+            break;
+          case 'keyboard-action':
+            if (msg.action === 'tab-enter') {
+              instance.tabAndEnter(msg.tabCount || 1).catch(() => {});
+            } else if (msg.action === 'focus-type') {
+              instance.focusAndType(msg.selector, msg.text).catch(() => {});
+            }
             break;
           case 'switch-page':
             instance.switchPage(msg.pageId).catch(() => {});

@@ -40,7 +40,7 @@ export default function ControlBadge({ mode, onToggle }) {
   return (
     <button
       onClick={onToggle}
-      className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${c.bg} ${c.text} hover:opacity-80 transition-opacity`}
+      className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${c.bg} ${c.text} hover:opacity-80 transition-opacity ${mode === 'agent' ? 'animate-pulse' : ''}`}
       title={`Control: ${c.label}. Click to toggle.`}
     >
       {c.icon}

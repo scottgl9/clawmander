@@ -173,6 +173,7 @@ class BrowserInstance {
       // Auto-switch to the new popup
       await this.switchPage(pageId);
       this._broadcastPagesUpdated();
+      this.emitter.emit('popup-opened', { pageId, url: newPage.url() });
     });
 
     return this;
@@ -457,11 +458,82 @@ class BrowserInstance {
   async click(x, y) {
     this.lastActivity = Date.now();
     await this.page.mouse.click(x, y);
+
+    // Diagnostics: identify what element was at the click point
+    const elementInfo = await this.page.evaluate(({ cx, cy }) => {
+      const el = document.elementFromPoint(cx, cy);
+      if (!el) return null;
+      return {
+        tag: el.tagName.toLowerCase(),
+        id: el.id || null,
+        className: (typeof el.className === 'string' ? el.className : '').slice(0, 100),
+        text: (el.textContent || '').trim().slice(0, 80),
+      };
+    }, { cx: x, cy: y }).catch(() => null);
+
+    return { x, y, elementInfo };
   }
 
   async clickSelector(selector) {
     this.lastActivity = Date.now();
-    await this.page.click(selector);
+    return this.clickSmart({ selector });
+  }
+
+  /**
+   * Smart click: tries role → text → CSS selector, returns structured result.
+   * @param {{ role?: string, name?: string, text?: string, selector?: string }} opts
+   */
+  async clickSmart({ role, name, text, selector } = {}) {
+    this.lastActivity = Date.now();
+    const strategies = [];
+
+    if (role) {
+      strategies.push({
+        label: 'role',
+        fn: () => this.page.getByRole(role, name ? { name } : undefined).click(),
+      });
+    }
+    if (text) {
+      strategies.push({
+        label: 'text',
+        fn: () => this.page.getByText(text).first().click(),
+      });
+    }
+    if (selector) {
+      strategies.push({
+        label: 'selector',
+        fn: () => this.page.locator(selector).first().click(),
+      });
+    }
+
+    if (strategies.length === 0) {
+      return { success: false, error: 'No click target specified (provide role, text, or selector)' };
+    }
+
+    for (const strategy of strategies) {
+      try {
+        await strategy.fn();
+        // Gather info about what was clicked
+        const info = await this.page.evaluate((sel) => {
+          let el;
+          try { el = sel ? document.querySelector(sel) : null; } catch {}
+          if (!el) el = document.activeElement;
+          if (!el) return null;
+          return {
+            tag: el.tagName.toLowerCase(),
+            id: el.id || null,
+            text: (el.textContent || '').trim().slice(0, 80),
+          };
+        }, selector || null).catch(() => null);
+
+        return { success: true, strategy: strategy.label, tagName: info?.tag, id: info?.id, textSnippet: info?.text };
+      } catch (err) {
+        // Try next strategy
+        continue;
+      }
+    }
+
+    return { success: false, error: 'All click strategies failed' };
   }
 
   async type(text) {
@@ -487,6 +559,26 @@ class BrowserInstance {
   async reload() {
     this.lastActivity = Date.now();
     await this.page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
+  }
+
+  /**
+   * Press Tab N times then Enter — useful for navigating OAuth dialogs.
+   */
+  async tabAndEnter(tabCount = 1) {
+    this.lastActivity = Date.now();
+    for (let i = 0; i < tabCount; i++) {
+      await this.page.keyboard.press('Tab');
+    }
+    await this.page.keyboard.press('Enter');
+  }
+
+  /**
+   * Click a selector to focus it, then type text into it.
+   */
+  async focusAndType(selector, text) {
+    this.lastActivity = Date.now();
+    await this.page.click(selector);
+    await this.page.keyboard.type(text);
   }
 
   async scroll(x, y, deltaY) {
@@ -555,7 +647,7 @@ class BrowserInstance {
     this.emitter.emit('control-changed', { mode, reason });
   }
 
-  requestUserControl(reason, timeoutMs = 300000) {
+  requestUserControl(reason, timeoutMs = 300000, checklist = null) {
     this.setControlMode('user', reason);
 
     return new Promise((resolve, reject) => {
@@ -570,18 +662,25 @@ class BrowserInstance {
       this._broadcastJSON({
         type: 'agent-message',
         message: reason || 'Agent needs your help',
+        checklist: checklist || null,
       });
     });
   }
 
   releaseToAgent() {
+    // Capture page context before resolving so agent knows where we are
+    let context = null;
+    try {
+      context = { url: this.page.url(), title: '' };
+    } catch {}
+
     if (this._userControlResolve) {
       clearTimeout(this._userControlTimeout);
       const resolve = this._userControlResolve;
       this._userControlResolve = null;
       this._userControlTimeout = null;
       this.setControlMode('shared');
-      resolve({ timedOut: false });
+      resolve({ timedOut: false, context });
     } else {
       this.setControlMode('shared');
     }
