@@ -22,6 +22,7 @@ export default function BrowserPanel({ instanceId }) {
     url,
     controlMode,
     agentMessage,
+    agentChecklist,
     viewportSize,
     navigate,
     goBack,
@@ -32,12 +33,15 @@ export default function BrowserPanel({ instanceId }) {
     sendType,
     sendScroll,
     sendMouseMove,
+    sendKeyboardAction,
     takeControl,
     releaseControl,
     pages,
     activePageId,
     switchPage,
     closePage,
+    lastClickInfo,
+    inputBlocked,
   } = useBrowser(instanceId, canvasRef);
 
   // Sync URL bar with actual URL
@@ -220,6 +224,15 @@ export default function BrowserPanel({ instanceId }) {
           </svg>
         </button>
 
+        {/* Tab+Enter quick action */}
+        <button
+          onClick={() => sendKeyboardAction('tab-enter', { tabCount: 1 })}
+          className="p-1.5 rounded text-gray-400 hover:text-white hover:bg-surface-lighter transition-colors text-xs"
+          title="Press Tab + Enter (keyboard fallback for buttons)"
+        >
+          Tab+Enter
+        </button>
+
         {/* Control badge */}
         <ControlBadge mode={controlMode} onToggle={handleControlToggle} />
 
@@ -263,7 +276,22 @@ export default function BrowserPanel({ instanceId }) {
       )}
 
       {/* Agent message banner */}
-      <AgentMessageBanner message={agentMessage} onRelease={releaseControl} />
+      <AgentMessageBanner message={agentMessage} checklist={agentChecklist} onRelease={releaseControl} />
+
+      {/* Input blocked toast */}
+      {inputBlocked && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/20 border border-red-500/30 backdrop-blur-sm text-sm text-red-300">
+            <span>{inputBlocked.reason}</span>
+            <button
+              onClick={takeControl}
+              className="px-2 py-1 text-xs font-medium rounded bg-red-500/30 text-red-200 hover:bg-red-500/50 transition-colors whitespace-nowrap"
+            >
+              Take Control
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Hidden input for mobile keyboard capture */}
       <input
@@ -287,22 +315,42 @@ export default function BrowserPanel({ instanceId }) {
         className="flex-1 min-h-0 flex items-center justify-center overflow-hidden"
         style={{ background: '#1a1b26' }}
       >
-        <canvas
-          ref={canvasRef}
-          tabIndex={0}
-          onClick={handleCanvasClick}
-          onTouchEnd={handleTouchEnd}
-          onWheel={handleCanvasWheel}
-          onMouseMove={handleCanvasMouseMove}
-          onKeyDown={handleKeyDown}
-          className="cursor-crosshair outline-none"
-          style={{
-            width: canvasStyle.width || '100%',
-            height: canvasStyle.height || '100%',
-            imageRendering: 'auto',
-            display: 'block',
-          }}
-        />
+        <div className="relative" style={{ width: canvasStyle.width || '100%', height: canvasStyle.height || '100%' }}>
+          <canvas
+            ref={canvasRef}
+            tabIndex={0}
+            onClick={handleCanvasClick}
+            onTouchEnd={handleTouchEnd}
+            onWheel={handleCanvasWheel}
+            onMouseMove={handleCanvasMouseMove}
+            onKeyDown={handleKeyDown}
+            className="cursor-crosshair outline-none"
+            style={{
+              width: '100%',
+              height: '100%',
+              imageRendering: 'auto',
+              display: 'block',
+            }}
+          />
+          {/* Click marker dot + tooltip */}
+          {lastClickInfo?.elementInfo && (
+            <div
+              className="absolute pointer-events-none animate-ping-once"
+              style={{
+                left: `${(lastClickInfo.x / viewportSize.width) * 100}%`,
+                top: `${(lastClickInfo.y / viewportSize.height) * 100}%`,
+                transform: 'translate(-50%, -50%)',
+              }}
+            >
+              <div className="w-3 h-3 rounded-full bg-blue-400/60 border border-blue-300/80" />
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-black/80 text-xs text-gray-200 whitespace-nowrap">
+                {lastClickInfo.elementInfo.tag}
+                {lastClickInfo.elementInfo.id ? `#${lastClickInfo.elementInfo.id}` : ''}
+                {lastClickInfo.elementInfo.text ? ` "${lastClickInfo.elementInfo.text.slice(0, 30)}"` : ''}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Disconnected overlay */}
