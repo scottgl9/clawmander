@@ -16,6 +16,9 @@ export default function useBrowser(instanceId, canvasRef) {
   const [viewportSize, setViewportSize] = useState({ width: 1280, height: 800 });
   const [pages, setPages] = useState([]);
   const [activePageId, setActivePageId] = useState(null);
+  const [lastClickInfo, setLastClickInfo] = useState(null);
+  const [inputBlocked, setInputBlocked] = useState(null);
+  const [agentChecklist, setAgentChecklist] = useState(null);
 
   const connect = useCallback(() => {
     if (!mountedRef.current || !instanceId) return;
@@ -83,6 +86,14 @@ export default function useBrowser(instanceId, canvasRef) {
           break;
         case 'agent-message':
           setAgentMessage(msg.message);
+          setAgentChecklist(msg.checklist || null);
+          break;
+        case 'click-ack':
+          setLastClickInfo(msg);
+          break;
+        case 'input-blocked':
+          setInputBlocked(msg);
+          setTimeout(() => setInputBlocked(null), 3000);
           break;
         case 'error':
           console.error('[Browser WS]', msg.message);
@@ -136,6 +147,8 @@ export default function useBrowser(instanceId, canvasRef) {
     setAgentMessage(null);
     sendJSON({ type: 'release-control' });
   }, [sendJSON]);
+  const sendKeyboardAction = useCallback((action, opts = {}) => sendJSON({ type: 'keyboard-action', action, ...opts }), [sendJSON]);
+  const sendClickSelector = useCallback((opts) => sendJSON({ type: 'click-selector', ...opts }), [sendJSON]);
   const switchPage = useCallback((pageId) => sendJSON({ type: 'switch-page', pageId }), [sendJSON]);
   const closePage = useCallback((pageId) => sendJSON({ type: 'close-page', pageId }), [sendJSON]);
 
@@ -145,9 +158,12 @@ export default function useBrowser(instanceId, canvasRef) {
     title,
     controlMode,
     agentMessage,
+    agentChecklist,
     viewportSize,
     pages,
     activePageId,
+    lastClickInfo,
+    inputBlocked,
     navigate,
     goBack,
     goForward,
@@ -157,6 +173,8 @@ export default function useBrowser(instanceId, canvasRef) {
     sendKey,
     sendScroll,
     sendMouseMove,
+    sendKeyboardAction,
+    sendClickSelector,
     takeControl,
     releaseControl,
     switchPage,

@@ -56,7 +56,11 @@ The browser runs **headless but persistent** on the gateway using the **system-i
 - Uses **CDP Page.startScreencast** for efficient JPEG frame streaming
 - Exposes a **control API** used by both agent tools and the WebSocket handler:
   - `navigate(url)`
-  - `click(x, y)`
+  - `click(x, y)` → returns `{ x, y, elementInfo }` diagnostics
+  - `clickSmart({ role, name, text, selector })` → robust multi-strategy click
+  - `clickSelector(selector)` → delegates to `clickSmart`
+  - `tabAndEnter(tabCount)` → keyboard navigation fallback
+  - `focusAndType(selector, text)` → click to focus + type
   - `type(text)`
   - `scroll(x, y, deltaY)`
   - `screenshot()` → base64 PNG
@@ -65,7 +69,7 @@ The browser runs **headless but persistent** on the gateway using the **system-i
   - `waitForSelector(selector, timeout)`
   - `getCurrentUrl()` / `getTitle()`
 - Manages **control mode**: `agent` | `user` | `shared`
-  - In `agent` mode: user input from frontend is ignored
+  - In `agent` mode: user input from frontend is **blocked with explicit error** (`input-blocked` message sent to client)
   - In `user` mode: agent actions are queued but not executed
   - In `shared` mode: both active (last-write-wins, visually indicated)
 - Emits **events** over an internal EventEmitter: `frame`, `url-changed`, `page-loaded`, `control-changed`, `browser-message`
@@ -91,8 +95,18 @@ The browser runs **headless but persistent** on the gateway using the **system-i
 { "type": "type", "text": "hello" }
 { "type": "key", "key": "Enter" }
 { "type": "scroll", "x": 0.5, "y": 0.5, "delta": -300 }
+{ "type": "click-selector", "selector": "#btn", "role": "button", "name": "Sign in", "text": "Sign in" }
+{ "type": "keyboard-action", "action": "tab-enter", "tabCount": 3 }
+{ "type": "keyboard-action", "action": "focus-type", "selector": "#email", "text": "user@example.com" }
 { "type": "take-control" }   // user requests control
 { "type": "release-control" } // user hands back to agent
+```
+
+**Server → Client additional messages:**
+```jsonc
+{ "type": "click-ack", "x": 512, "y": 400, "elementInfo": { "tag": "button", "id": "btn", "className": "...", "text": "..." } }
+{ "type": "click-selector-ack", "success": true, "strategy": "role", "tagName": "button", "id": "btn", "textSnippet": "..." }
+{ "type": "input-blocked", "reason": "Control mode is agent", "mode": "agent" }
 ```
 
 ### Frontend: BrowserPanel Component

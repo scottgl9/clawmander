@@ -932,3 +932,59 @@ The dashboard will automatically update category spent amounts and show real-tim
 
 ---
 
+## Browser
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/browser` | List all browser instances |
+| `POST` | `/api/browser` | Create browser instance |
+| `GET` | `/api/browser/:id` | Get instance detail |
+| `DELETE` | `/api/browser/:id` | Destroy instance |
+| `POST` | `/api/browser/:id/navigate` | Navigate to URL |
+| `POST` | `/api/browser/:id/click` | Click at coordinates or CSS selector |
+| `POST` | `/api/browser/:id/click-selector` | Smart click (role/text/selector) |
+| `POST` | `/api/browser/:id/type` | Type text |
+| `POST` | `/api/browser/:id/key` | Press key |
+| `POST` | `/api/browser/:id/scroll` | Scroll at position |
+| `POST` | `/api/browser/:id/keyboard-action` | Keyboard actions (tab-enter, focus-type) |
+| `POST` | `/api/browser/:id/screenshot` | Take screenshot |
+| `POST` | `/api/browser/:id/evaluate` | Evaluate JavaScript |
+| `POST` | `/api/browser/:id/content` | Get page content |
+| `POST` | `/api/browser/:id/wait` | Wait for selector |
+| `POST` | `/api/browser/:id/control` | Set control mode |
+| `POST` | `/api/browser/:id/request-user-control` | Request user control (blocks) |
+| `GET` | `/api/browser/:id/pages` | List open pages/tabs |
+| `POST` | `/api/browser/:id/pages/:pageId/activate` | Switch to a page/tab |
+
+### Smart Click (`POST /api/browser/:id/click-selector`)
+
+Tries multiple strategies in order: role → text → CSS selector.
+
+```bash
+curl -X POST http://localhost:3001/api/browser/my-browser/click-selector \
+  -H "Content-Type: application/json" \
+  -d '{ "role": "button", "name": "Sign in", "text": "Sign in", "selector": "#sign-in-btn" }'
+```
+
+### Keyboard Actions (`POST /api/browser/:id/keyboard-action`)
+
+```bash
+# Tab + Enter (navigate OAuth dialogs)
+curl -X POST http://localhost:3001/api/browser/my-browser/keyboard-action \
+  -H "Content-Type: application/json" \
+  -d '{ "action": "tab-enter", "tabCount": 3 }'
+
+# Focus and type
+curl -X POST http://localhost:3001/api/browser/my-browser/keyboard-action \
+  -H "Content-Type: application/json" \
+  -d '{ "action": "focus-type", "selector": "#email", "text": "user@example.com" }'
+```
+
+### WebSocket
+
+Connect to `/ws/browser/:instanceId` for live streaming and interaction. See [BROWSER.md](BROWSER.md) for full message protocol.
+
+---
+
