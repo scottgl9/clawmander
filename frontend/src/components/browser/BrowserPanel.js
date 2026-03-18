@@ -13,6 +13,8 @@ export default function BrowserPanel({ instanceId }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const hiddenInputRef = useRef(null);
+  const touchStartRef = useRef(null);
+  const lastTouchRef = useRef(null);
   const [urlInput, setUrlInput] = useState('');
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [keyboardActive, setKeyboardActive] = useState(false);
@@ -101,16 +103,55 @@ export default function BrowserPanel({ instanceId }) {
     sendClick(x, y);
   }, [getNormalizedCoords, sendClick]);
 
-  // Touch support for mobile
+  // Touch support for mobile — scroll + tap-to-click
+  const scrollSensitivity = 3;
+
+  const handleTouchStart = useCallback((e) => {
+    if (e.touches.length === 0) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const point = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+    touchStartRef.current = point;
+    lastTouchRef.current = point;
+  }, []);
+
+  const handleTouchMove = useCallback((e) => {
+    if (e.touches.length === 0 || !lastTouchRef.current) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const deltaY = lastTouchRef.current.y - touch.clientY;
+    if (Math.abs(deltaY) > 2) {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const normX = (touch.clientX - rect.left) / rect.width;
+        const normY = (touch.clientY - rect.top) / rect.height;
+        sendScroll(normX, normY, deltaY * scrollSensitivity);
+      }
+    }
+    lastTouchRef.current = { x: touch.clientX, y: touch.clientY };
+  }, [sendScroll, scrollSensitivity]);
+
   const handleTouchEnd = useCallback((e) => {
-    if (e.changedTouches.length === 0) return;
+    if (e.changedTouches.length === 0 || !touchStartRef.current) return;
     const touch = e.changedTouches[0];
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = (touch.clientX - rect.left) / rect.width;
-    const y = (touch.clientY - rect.top) / rect.height;
-    sendClick(x, y);
+    const start = touchStartRef.current;
+    const elapsed = Date.now() - start.time;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    // Only fire click for short taps with minimal movement
+    if (elapsed < 300 && distance < 10) {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const x = (touch.clientX - rect.left) / rect.width;
+        const y = (touch.clientY - rect.top) / rect.height;
+        sendClick(x, y);
+      }
+    }
+    touchStartRef.current = null;
+    lastTouchRef.current = null;
   }, [sendClick]);
 
   const handleCanvasWheel = useCallback((e) => {
@@ -320,6 +361,8 @@ export default function BrowserPanel({ instanceId }) {
             ref={canvasRef}
             tabIndex={0}
             onClick={handleCanvasClick}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
             onWheel={handleCanvasWheel}
             onMouseMove={handleCanvasMouseMove}
@@ -330,6 +373,7 @@ export default function BrowserPanel({ instanceId }) {
               height: '100%',
               imageRendering: 'auto',
               display: 'block',
+              touchAction: 'none',
             }}
           />
           {/* Click marker dot + tooltip */}
