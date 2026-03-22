@@ -988,3 +988,89 @@ Connect to `/ws/browser/:instanceId` for live streaming and interaction. See [BR
 
 ---
 
+## Gateway Management
+
+### Restart Gateway
+```
+POST /api/gateway/restart
+```
+Fire-and-forget. Executes `openclaw gateway restart` and returns immediately.
+
+Response 202:
+```json
+{ "ok": true, "message": "Gateway restart initiated." }
+```
+
+### Gateway Status
+```
+GET /api/gateway/status
+```
+Simple health check.
+
+Response 200:
+```json
+{ "connected": true }
+```
+
+---
+
+## Exec Approvals
+
+Manage exec security policies for OpenClaw agents.
+
+### Get All Approvals
+```
+GET /api/approvals
+```
+Returns combined view of global exec settings, per-agent overrides, and allowlists.
+
+Response 200:
+```json
+{
+  "defaults": { "security": "allowlist", "ask": "on-miss" },
+  "agents": [
+    {
+      "id": "my-agent",
+      "name": "My Agent",
+      "security": "allowlist",
+      "allowlist": [{ "id": "uuid", "pattern": "npm run *", "lastUsedAt": null }]
+    }
+  ],
+  "wildcardAllowlist": []
+}
+```
+
+### Update Default Exec Settings
+```
+PUT /api/approvals/defaults
+Content-Type: application/json
+
+{ "security": "allowlist", "ask": "on-miss" }
+```
+Security levels: `full`, `allowlist`, `deny`
+Ask behaviors: `on-miss`, `always`, `never`
+
+### Update Per-Agent Security
+```
+PUT /api/approvals/agents/:id
+Content-Type: application/json
+
+{ "security": "full" }
+```
+
+### Add Allowlist Pattern
+```
+POST /api/approvals/agents/:id/allowlist
+Content-Type: application/json
+
+{ "pattern": "npm run *" }
+```
+Use `*` as agent ID for the global wildcard allowlist.
+
+### Delete Allowlist Entry
+```
+DELETE /api/approvals/agents/:id/allowlist/:entryId
+```
+
+---
+

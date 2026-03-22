@@ -5,11 +5,13 @@ Requires=clawmander-backend.service
 
 [Service]
 Type=simple
-Environment="PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PATH=%h/.npm-global/bin:%h/.local/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin"
 WorkingDirectory=%h/sandbox/personal/clawmander/frontend
 ExecStart=/home/linuxbrew/.linuxbrew/bin/npm run start
 Restart=on-failure
 RestartSec=10
+TimeoutStopSec=10
+KillMode=mixed
 StandardOutput=journal
 StandardError=journal
 

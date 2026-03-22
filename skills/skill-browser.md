@@ -13,6 +13,8 @@ Drive a persistent headless browser via REST API. Use this for web research, for
 
 - **Live viewer socket**: browser live-view/control is available at `ws://<host>/ws/browser/:id`.
 - **REST vs WS split**: use REST (`/api/browser/...`) for deterministic agent actions; use WS for interactive live control/observability.
+- **Multi-page/tab aware**: an instance can have multiple pages/tabs; list and activate them via `/api/browser/:id/pages`.
+- **Auth reliability helpers**: use smart selector clicks (`/click-selector`) and keyboard actions (`/keyboard-action`) for fragile login flows.
 
 - **Instances**: Each browser instance is an isolated Chrome process with its own cookies, localStorage, and session. Create one per task or reuse the `default` instance.
 - **Persistent profiles**: Sessions survive restarts. Cookies and logins are preserved in `~/.openclaw/browser-profiles/<id>/`.
@@ -152,6 +154,34 @@ Content-Type: application/json
 { "x": 640, "y": 400 }
 ```
 
+### Smart Click (selector/role/text)
+Use this first for brittle login/auth pages.
+
+```
+POST /api/browser/:id/click-selector
+Content-Type: application/json
+
+{ "selector": "button[data-testid='google-signin']" }
+```
+
+or
+
+```
+POST /api/browser/:id/click-selector
+Content-Type: application/json
+
+{ "role": "button", "name": "Sign in as clawmander" }
+```
+
+or
+
+```
+POST /api/browser/:id/click-selector
+Content-Type: application/json
+
+{ "text": "Sign in as clawmander" }
+```
+
 ### Type Text
 
 Types text character-by-character into the currently focused element:
@@ -173,6 +203,25 @@ Content-Type: application/json
 ```
 
 Common keys: `Enter`, `Tab`, `Escape`, `Backspace`, `ArrowDown`, `ArrowUp`, `Space`, `Delete`
+
+### Keyboard Action Helpers
+For login pages where click is flaky:
+
+```
+POST /api/browser/:id/keyboard-action
+Content-Type: application/json
+
+{ "action": "tab-enter", "tabCount": 3 }
+```
+
+or
+
+```
+POST /api/browser/:id/keyboard-action
+Content-Type: application/json
+
+{ "action": "focus-type", "selector": "input[name='text']", "text": "scottgl" }
+```
 
 ### Scroll
 
@@ -200,15 +249,33 @@ Content-Type: application/json
 
 Modes: `shared`, `agent`, `user`
 
+### Page/Tab Management
+List pages:
+
+```
+GET /api/browser/:id/pages
+```
+
+Activate a page:
+
+```
+POST /api/browser/:id/pages/:pageId/activate
+```
+
 ### WebSocket interactive actions (live panel)
 When connected to `ws://<host>/ws/browser/:id`, the frontend/live client can send:
 - `navigate` (`{ type:"navigate", url }`)
 - `back`, `forward`, `reload`
 - `click` (`x`,`y` normalized 0..1)
+- `click-selector` (`selector` / `role+name` / `text`)
 - `type`, `key`
+- `keyboard-action` (`tab-enter`, `focus-type`)
 - `scroll` (`x`,`y`,`delta`)
 - `mousemove`
+- `switch-page`, `close-page`
 - `take-control`, `release-control`
+
+If control mode is `agent`, user input WS actions (`click/type/key/scroll/mousemove`) may return an `input-blocked` event.
 
 Use REST endpoints for scriptable agent workflows; use WS actions for user live steering.
 ### Request User Control (Blocking)
@@ -340,7 +407,7 @@ curl -s -X POST $BASE/api/browser/$ID/click \
 
 ## Best Practices
 
-1. **Prefer `selector` clicks over coordinates** — selectors are stable across page layouts
+1. **Prefer `click-selector` first, then selector click, then coordinates** — semantic targeting is most stable on auth-heavy pages
 2. **Always `wait` after navigation or clicks** that trigger page loads — don't assume content is ready
 3. **Use `content` to read data**, not `screenshot` — text extraction is faster and more actionable
 4. **Use `screenshot` to verify** visual state when text alone is ambiguous

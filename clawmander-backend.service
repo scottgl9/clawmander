@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-Environment="PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PATH=%h/.npm-global/bin:%h/.local/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin"
 WorkingDirectory=%h/sandbox/personal/clawmander/backend
 ExecStart=/home/linuxbrew/.linuxbrew/bin/node server.js
 Restart=on-failure
