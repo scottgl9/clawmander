@@ -175,7 +175,6 @@ export default function ExecApprovals() {
 
   const loadData = async () => {
     try {
-      setLoading(true);
       const result = await approvalsApi.getAll();
       setData(result);
       setDefaults(result.defaults || { security: 'allowlist', ask: 'on-miss' });
