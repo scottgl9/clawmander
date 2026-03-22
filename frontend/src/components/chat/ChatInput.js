@@ -44,13 +44,13 @@ export default function ChatInput({ onSend, onAbort, onAction, sending, disabled
   };
 
   const handleSend = useCallback(() => {
-    if (!input.trim() || sending) return;
+    if (!input.trim()) return;
     onSend(input.trim(), attachments);
     setInput('');
     setAttachments([]);
     setShowSlash(false);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
-  }, [input, attachments, sending, onSend]);
+  }, [input, attachments, onSend]);
 
   const handleSlashSelect = (cmd) => {
     setInput(cmd);
@@ -84,7 +84,7 @@ export default function ChatInput({ onSend, onAbort, onAction, sending, disabled
     setAttachments((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const canSend = input.trim() && !sending && !disabled;
+  const canSend = input.trim() && !disabled;
 
   return (
     <div className="border-t border-gray-800 bg-gray-900 px-4 py-3 safe-area-bottom">
@@ -163,29 +163,30 @@ export default function ChatInput({ onSend, onAbort, onAction, sending, disabled
           </button>
         )}
 
-        {/* Send / Abort button */}
-        {sending ? (
+        {/* Stop button — only when actively streaming */}
+        {sending && (
           <button
             onClick={onAbort}
             className="flex-shrink-0 p-2 bg-red-700 hover:bg-red-600 text-white rounded-xl transition-colors"
-            title="Abort"
+            title="Stop & clear queue"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
               <rect x="6" y="6" width="12" height="12" rx="1" />
             </svg>
           </button>
-        ) : (
-          <button
-            onClick={handleSend}
-            disabled={!canSend}
-            className="flex-shrink-0 p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            title="Send (Enter)"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-            </svg>
-          </button>
         )}
+
+        {/* Send button */}
+        <button
+          onClick={handleSend}
+          disabled={!canSend}
+          className="flex-shrink-0 p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          title={sending ? 'Queue message' : 'Send (Enter)'}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+          </svg>
+        </button>
       </div>
     </div>
   );

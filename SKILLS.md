@@ -29,6 +29,7 @@ Read operations (`GET`) are open. The token is set via `AUTH_TOKEN` in `backend/
 | Dashboard Views | [skills/skill-views.md](skills/skill-views.md) | Aggregated daily/weekly/monthly views, activity log |
 | System & Events | [skills/skill-system.md](skills/skill-system.md) | Health checks, SSE real-time events, commands |
 | Virtual Browser | [skills/skill-browser.md](skills/skill-browser.md) | Control persistent Chrome instances for web automation and research |
+| Gateway Management | [skills/skill-gateway.md](skills/skill-gateway.md) | Restart gateway, manage exec approvals and allowlists |
 
 ---
 
@@ -75,5 +76,15 @@ Read operations (`GET`) are open. The token is set via `AUTH_TOKEN` in `backend/
 | Create browser instance | POST | `/api/browser` | Yes |
 | Browser navigate | POST | `/api/browser/:id/navigate` | Yes |
 | Browser click/type/key/scroll | POST | `/api/browser/:id/{click|type|key|scroll}` | Yes |
-| Browser content/screenshot | POST | `/api/browser/:id/{content|screenshot}` | Yes |
+| Browser smart click | POST | `/api/browser/:id/click-selector` | Yes |
+| Browser keyboard actions | POST | `/api/browser/:id/keyboard-action` | Yes |
+| Browser page list/activate | GET/POST | `/api/browser/:id/pages`, `/api/browser/:id/pages/:pageId/activate` | Yes |
+| Browser content/screenshot/evaluate/wait | POST | `/api/browser/:id/{content|screenshot|evaluate|wait}` | Yes |
 | Browser user handoff | POST | `/api/browser/:id/request-user-control` | Yes |
+| Restart gateway | POST | `/api/gateway/restart` | No |
+| Gateway status | GET | `/api/gateway/status` | No |
+| Get exec approvals | GET | `/api/approvals` | No |
+| Update exec defaults | PUT | `/api/approvals/defaults` | No |
+| Update agent security | PUT | `/api/approvals/agents/:id` | No |
+| Add allowlist pattern | POST | `/api/approvals/agents/:id/allowlist` | No |
+| Delete allowlist entry | DELETE | `/api/approvals/agents/:id/allowlist/:entryId` | No |
