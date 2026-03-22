@@ -24,6 +24,11 @@ export function useChatState() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [error, setError] = useState(null);
 
+  // Message queue: Map<sessionKey, {text, attachments, msgId}[]>
+  const [messageQueue, setMessageQueue] = useState({});
+  const queuedSendRef = useRef(null);
+  const processQueueRef = useRef(null);
+
   const streamingRef = useRef({ runId: null, content: '' });
   const activeSessionRef = useRef(null);
   // Stable ref to loadHistory so handleSSEEvent ([] deps) can call it without stale closures
@@ -36,6 +41,10 @@ export function useChatState() {
   const sending = activeSession ? (sendingMap[activeSession] || false) : false;
   const streamingContent = activeSession ? (streamingContentMap[activeSession] || '') : '';
   const streamingRunId = activeSession ? (streamingRunIdMap[activeSession] || null) : null;
+
+  const setSendingForSession = useCallback((sessionKey, value) => {
+    setSendingMap(prev => ({ ...prev, [sessionKey]: value }));
+  }, []);
 
   // Load sessions + models
   const loadSessions = useCallback(async () => {
@@ -107,6 +116,18 @@ export function useChatState() {
     setActiveSession(sessionKey);
     loadHistory(sessionKey);
   }, [loadHistory]);
+
+  // Process queued messages for a session
+  const processQueue = useCallback((sessionKey) => {
+    setMessageQueue(prev => {
+      const queue = prev[sessionKey];
+      if (!queue || queue.length === 0) return prev;
+      const [next, ...rest] = queue;
+      queuedSendRef.current = { sessionKey, ...next };
+      return { ...prev, [sessionKey]: rest };
+    });
+  }, []);
+  processQueueRef.current = processQueue;
 
   // Handle SSE events
   const handleSSEEvent = useCallback((event) => {
@@ -197,6 +218,7 @@ export function useChatState() {
           return prev;
         });
         setSendingMap((prev) => ({ ...prev, [sessionKey]: false }));
+        setTimeout(() => processQueueRef.current?.(sessionKey), 0);
         break;
       }
       case 'chat.error': {
@@ -224,6 +246,7 @@ export function useChatState() {
           return prev;
         });
         setSendingMap((prev) => ({ ...prev, [sessionKey]: false }));
+        setTimeout(() => processQueueRef.current?.(sessionKey), 0);
         setError(errMsg);
         break;
       }
@@ -235,14 +258,17 @@ export function useChatState() {
         setMessages((prev) => {
           const sessionMsgs = prev[sessionKey] || [];
           const idx = sessionMsgs.findIndex((m) => m.runId === runId && m.role === 'assistant');
+          let updated = sessionMsgs;
           if (idx !== -1) {
-            const updated = [...sessionMsgs];
+            updated = [...sessionMsgs];
             updated[idx] = { ...updated[idx], state: 'aborted' };
-            return { ...prev, [sessionKey]: updated };
           }
-          return prev;
+          // Clear queued messages on abort
+          return { ...prev, [sessionKey]: updated.filter(m => m.state !== 'queued') };
         });
         setSendingMap((prev) => ({ ...prev, [sessionKey]: false }));
+        // Clear the queue for this session
+        setMessageQueue(prev => ({ ...prev, [sessionKey]: [] }));
         break;
       }
       case 'chat.approval':
@@ -260,69 +286,108 @@ export function useChatState() {
         if (activeSessionRef.current) {
           loadHistoryRef.current?.(activeSessionRef.current);
         }
-        setSendingMap((prev) => {
-          if (!activeSessionRef.current) return prev;
-          return { ...prev, [activeSessionRef.current]: false };
-        });
+        setSendingMap({});
         break;
       default:
         break;
     }
   }, []);
 
-  // Send a message (or slash command)
-  const sendMessage = useCallback(async (text, attachments = []) => {
-    if (!activeSession || !text.trim()) return;
-    // Per-session sending guard
-    if (sendingMap[activeSession]) return;
+  // Core send logic — sends a message directly to the API
+  const sendMessageDirect = useCallback(async (sessionKey, text, attachments = [], fromQueue = false) => {
+    setSendingForSession(sessionKey, true);
 
-    // Handle slash commands
-    if (text.startsWith('/')) {
-      return handleSlashCommand(text.trim());
-    }
-
-    setError(null);
-    setSendingMap((prev) => ({ ...prev, [activeSession]: true }));
-
-    // Optimistically add user message to UI
-    const tempUserMsg = {
-      id: `temp-user-${Date.now()}`,
-      sessionKey: activeSession,
-      role: 'user',
-      content: text,
-      attachments,
-      state: 'complete',
-      timestamp: new Date().toISOString(),
-    };
-    // Optimistically add assistant placeholder
     const tempAsstMsg = {
       id: `temp-asst-${Date.now()}`,
-      sessionKey: activeSession,
+      sessionKey,
       role: 'assistant',
       content: '',
       state: 'streaming',
       timestamp: new Date().toISOString(),
     };
 
-    setMessages((prev) => ({
-      ...prev,
-      [activeSession]: [...(prev[activeSession] || []), tempUserMsg, tempAsstMsg],
-    }));
+    if (fromQueue) {
+      // Promote queued message to complete state, then append assistant placeholder
+      setMessages((prev) => {
+        const sessionMsgs = (prev[sessionKey] || []).map(m =>
+          m.state === 'queued' && m.content === text ? { ...m, state: 'complete' } : m
+        );
+        return { ...prev, [sessionKey]: [...sessionMsgs, tempAsstMsg] };
+      });
+    } else {
+      const tempUserMsg = {
+        id: `temp-user-${Date.now()}`,
+        sessionKey,
+        role: 'user',
+        content: text,
+        attachments,
+        state: 'complete',
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => ({
+        ...prev,
+        [sessionKey]: [...(prev[sessionKey] || []), tempUserMsg, tempAsstMsg],
+      }));
+    }
 
     try {
-      await chatApi.send(activeSession, text, attachments);
+      await chatApi.send(sessionKey, text, attachments);
     } catch (err) {
-      setSendingMap((prev) => ({ ...prev, [activeSession]: false }));
+      setSendingForSession(sessionKey, false);
       setError(err.message);
       // Remove placeholder on failure
       setMessages((prev) => {
-        const sessionMsgs = (prev[activeSession] || []).filter(
+        const sessionMsgs = (prev[sessionKey] || []).filter(
           (m) => m.id !== tempAsstMsg.id
         );
-        return { ...prev, [activeSession]: sessionMsgs };
+        return { ...prev, [sessionKey]: sessionMsgs };
       });
     }
-  }, [activeSession, sendingMap]);
+  }, [setSendingForSession]);
+
+  // Send a message (or slash command) — queues if session is busy
+  const sendMessage = useCallback(async (text, attachments = []) => {
+    if (!activeSession || !text.trim()) return;
+
+    // Handle slash commands
+    if (text.startsWith('/')) {
+      return handleSlashCommand(text.trim());
+    }
+
+    if (sendingMap[activeSession]) {
+      // Queue: add user message with state='queued', push to queue
+      const queuedMsg = {
+        id: `queued-user-${Date.now()}`,
+        sessionKey: activeSession,
+        role: 'user',
+        content: text,
+        attachments,
+        state: 'queued',
+        timestamp: new Date().toISOString(),
+      };
+      setMessages(prev => ({
+        ...prev,
+        [activeSession]: [...(prev[activeSession] || []), queuedMsg],
+      }));
+      setMessageQueue(prev => ({
+        ...prev,
+        [activeSession]: [...(prev[activeSession] || []), { text, attachments, msgId: queuedMsg.id }],
+      }));
+      return;
+    }
+
+    setError(null);
+    await sendMessageDirect(activeSession, text, attachments);
+  }, [activeSession, sendingMap, sendMessageDirect]);
+
+  // Effect to process queued sends
+  useEffect(() => {
+    if (queuedSendRef.current) {
+      const { sessionKey, text, attachments } = queuedSendRef.current;
+      queuedSendRef.current = null;
+      sendMessageDirect(sessionKey, text, attachments, true);
+    }
+  });
 
   // Inject a local-only system message (not sent to gateway)
   const injectSystemMessage = useCallback((sessionKey, content) => {
@@ -361,6 +426,11 @@ export function useChatState() {
           if (activeSession) {
             await chatApi.resetSession(activeSession, 'new');
             setMessages((prev) => ({ ...prev, [activeSession]: [] }));
+            setSendingMap((prev) => ({ ...prev, [activeSession]: false }));
+            setMessageQueue((prev) => ({ ...prev, [activeSession]: [] }));
+            setStreamingContentMap((prev) => ({ ...prev, [activeSession]: '' }));
+            setStreamingRunIdMap((prev) => ({ ...prev, [activeSession]: null }));
+            streamingRef.current = { runId: null, content: '' };
           }
           break;
         case '/abort':
@@ -471,6 +541,7 @@ export function useChatState() {
     subagentActivity,
     connected,
     sending,
+    messageQueue,
     loadingHistory,
     error,
     setError,

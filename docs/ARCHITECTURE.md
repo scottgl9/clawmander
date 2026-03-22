@@ -37,6 +37,7 @@ Technical architecture and design decisions for the Clawmander Dashboard.
 │  │  - AgentService     │                 │  - Clients      ││
 │  │  - HeartbeatService │                 └─────────────────┘│
 │  │  - ActionItemService│                                    │
+│  │  - OpenClawCLI     │                                    │
 │  └────────────┬────────┘                                     │
 │               │                                              │
 │  ┌────────────▼────────┐                 ┌─────────────────┐│
@@ -73,6 +74,7 @@ frontend/src/
 │   ├── layout/         # Layout components (Header, Sidebar, Layout)
 │   ├── kanban/         # Kanban board components
 │   ├── chat/           # Chat UI (ChatPage, ChatInput, ChatMessage, etc.)
+│   ├── settings/       # Settings UI (ExecApprovals, GatewaySettings)
 │   ├── drawings/       # Excalidraw canvas (DrawPage, DrawingSidebar, ExcalidrawWrapper)
 │   ├── voice/          # Voice page (VoicePage, VoiceSettingsPanel)
 │   ├── server/         # Server settings (ServiceSettings)
@@ -84,7 +86,8 @@ frontend/src/
 ├── hooks/
 │   ├── useSSE.js              # SSE connection hook
 │   ├── useAPI.js              # API fetch hook
-│   ├── useChatState.js        # Chat session + message state
+│   ├── useChatState.js        # Chat session + message state + message queue
+│   ├── useGatewayRestart.js   # Gateway restart state machine
 │   ├── useSpeechRecognition.js # Web Speech API wrapper (STT)
 │   ├── useTextToSpeech.js     # TTS via Chatterbox backend proxy
 │   ├── useVoiceSettings.js    # Voice preferences (localStorage)
@@ -92,6 +95,7 @@ frontend/src/
 ├── lib/
 │   ├── api.js          # API client (tasks, drawings, etc.)
 │   ├── chatApi.js      # Chat + voice API client
+│   ├── approvalsApi.js # Exec approvals API client
 │   └── constants.js    # App-wide constants
 ├── pages/
 │   ├── index.js        # Main dashboard (agent status dot + widgets)
@@ -136,10 +140,17 @@ frontend/src/
 - `useSSE` - Manages EventSource lifecycle and reconnection detection
 - `useAPI` - Handles fetch with loading/error states; re-fetches when deps (including refreshKey) change
 
-**4. Component Composition**
+**5. Component Composition**
 - Small, focused components
 - Props-down data flow
 - No prop drilling (data fetched at page level)
+
+**6. Message Queue Pattern**
+- `useChatState` supports queuing messages when the agent is busy (streaming a response)
+- Queued messages display in the UI with `state: 'queued'` and muted styling
+- On `chat.final` or `chat.error`, the next queued message is automatically sent via `processQueue()`
+- On `chat.aborted`, all queued messages are cleared (user is redirecting)
+- Queue state is per-session — each session has its own independent queue
 
 ## Backend Architecture
 
@@ -172,6 +183,8 @@ backend/
 │   ├── tasks.js                # Task endpoints
 │   ├── sse.js                  # SSE endpoint
 │   ├── chat.js                 # Chat proxy endpoints
+│   ├── gateway.js              # Gateway restart/status endpoints
+│   ├── approvals.js            # Exec approvals CRUD endpoints
 │   ├── drawings.js             # Excalidraw CRUD endpoints
 │   ├── voice.js                # TTS proxy + status endpoint
 │   └── ...                     # Other routes
@@ -180,6 +193,7 @@ backend/
 │   ├── AgentService.js         # Agent business logic
 │   ├── HeartbeatService.js     # Heartbeat logic
 │   ├── ActionItemService.js   # Action item CRUD (personal/work)
+│   ├── OpenClawCLI.js          # OpenClaw CLI wrapper (config, approvals)
 │   └── SSEManager.js           # SSE client management
 ├── storage/
 │   ├── FileStore.js            # Generic JSON storage

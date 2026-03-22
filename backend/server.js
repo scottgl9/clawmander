@@ -18,6 +18,7 @@ const MemoryService = require('./services/MemoryService');
 const DrawingService = require('./services/DrawingService');
 const TerminalService = require('./services/TerminalService');
 const BrowserManager = require('./services/BrowserManager');
+const OpenClawCLI = require('./services/OpenClawCLI');
 const AuthDB = require('./storage/AuthDB');
 const { attachTerminalWS } = require('./routes/terminal');
 const { attachBrowserWS } = require('./routes/browser');
@@ -59,6 +60,7 @@ const memoryService = new MemoryService();
 const drawingService = new DrawingService(sseManager);
 const terminalService = new TerminalService();
 const browserManager = new BrowserManager(sseManager, config);
+const openClawCLI = new OpenClawCLI(config.openClawHome);
 
 // Wire chat events into ChatService for message history tracking
 sseManager._origBroadcast = sseManager.broadcast.bind(sseManager);
@@ -72,7 +74,7 @@ sseManager.broadcast = function (event, data) {
 };
 
 // Routes
-mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, cronService, memoryService, drawingService, config, authDB, browserManager });
+mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, cronService, memoryService, drawingService, config, authDB, browserManager, openClawCLI });
 
 // Health check
 app.get('/api/health', (req, res) => {

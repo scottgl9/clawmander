@@ -16,6 +16,7 @@ export default function ChatMessage({ message, onSpeak, onRetry }) {
   const isStreaming = message.state === 'streaming';
   const isError = message.state === 'error';
   const isAborted = message.state === 'aborted';
+  const isQueued = message.state === 'queued';
 
   const handleCopy = useCallback(() => {
     if (!message.content) return;
@@ -37,7 +38,7 @@ export default function ChatMessage({ message, onSpeak, onRetry }) {
   }
 
   return (
-    <div className={`group flex ${isUser ? 'justify-end' : 'justify-start'} mb-3 px-4`}>
+    <div className={`group flex ${isUser ? 'justify-end' : 'justify-start'} mb-3 px-4 ${isQueued ? 'opacity-60' : ''}`}>
       {/* Avatar for assistant */}
       {!isUser && (
         <div className="w-7 h-7 rounded-full bg-blue-600 flex-shrink-0 flex items-center justify-center text-white text-xs font-bold mr-2 mt-0.5">
@@ -51,14 +52,21 @@ export default function ChatMessage({ message, onSpeak, onRetry }) {
         {(message.content || isError || isAborted) && (
           <div
             className={`px-3 py-2 rounded-2xl text-sm leading-relaxed min-w-0 overflow-hidden ${
-              isUser
+              isQueued
+                ? 'bg-blue-600/50 text-white/70 rounded-tr-sm border border-dashed border-blue-400/30'
+                : isUser
                 ? 'bg-blue-600 text-white rounded-tr-sm'
                 : isError
                 ? 'bg-red-900/40 border border-red-700/50 text-red-300 rounded-tl-sm'
                 : 'bg-gray-800 text-gray-100 rounded-tl-sm'
             }`}
           >
-            {isUser ? (
+            {isQueued ? (
+              <div className="whitespace-pre-wrap">
+                {message.content}
+                <span className="text-xs text-blue-300/60 italic ml-1">[queued]</span>
+              </div>
+            ) : isUser ? (
               <div className="whitespace-pre-wrap">{message.content}</div>
             ) : (
               <>
