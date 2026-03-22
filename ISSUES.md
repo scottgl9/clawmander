@@ -1,5 +1,82 @@
 # Known Issues
 
+## Chat Messages Cannot Be Queued While Agent Is Responding
+
+**Status**: Resolved (2026-03-21)
+**Severity**: Medium
+
+### Description
+
+Previously, users could not send additional messages while an agent was actively streaming a response. The send button was disabled during streaming.
+
+### Resolution
+
+Implemented message queuing: messages sent while the agent is busy are displayed with a `[queued]` indicator and automatically sent in order when the current response completes. Aborting a run clears all queued messages.
+
+---
+
+## No Gateway Restart From Dashboard
+
+**Status**: Resolved (2026-03-21)
+**Severity**: Low
+
+### Description
+
+There was no way to restart the OpenClaw gateway from the dashboard UI — required SSH access to run `openclaw gateway restart` manually.
+
+### Resolution
+
+Added Gateway tab in Settings page with a restart button, confirmation modal, and status polling.
+
+---
+
+## No Exec Approvals Management UI
+
+**Status**: Resolved (2026-03-21)
+**Severity**: Medium
+
+### Description
+
+Agent exec security settings (allowlist, deny, full) and command allowlists could only be managed via the OpenClaw CLI. No dashboard UI existed for managing permissions.
+
+### Resolution
+
+Added Security tab in Settings page with global exec settings, per-agent security overrides, and allowlist pattern management.
+
+---
+
+## Dashboard Auto-Refresh Loses Gateway Connection
+
+**Status**: Investigating
+**Severity**: High (dashboard appears disconnected after browser refresh)
+**Date Reported**: 2026-03-19
+
+### Description
+
+When the Clawmander dashboard auto-refreshes (or manual browser refresh happens), the UI loses its OpenClaw gateway connection.
+
+### Symptoms
+
+- Dashboard reconnect attempts loop after refresh
+- Gateway logs show repeated unauthorized handshakes from the dashboard client
+- Connection fails with missing token during reconnect
+
+### Observed Gateway Log Signature
+
+- `unauthorized ... reason=token_missing`
+- handshake closed with `code=1008`
+
+### Notes
+
+Likely reconnect/auth state bug on refresh path (token not being attached during websocket reconnect).
+
+Additional evidence from logs:
+- OpenClaw gateway repeatedly logs `unauthorized ... reason=token_missing` with websocket close `code=1008` during/after refresh.
+- Clawmander backend briefly logs `connect ECONNREFUSED 127.0.0.1:18789` during gateway restart windows; reconnect succeeds shortly after.
+- Issue observed on mobile/PWA context where app resume/refresh should not require full page reload.
+
+---
+
 ## Agent Tasks View Bugs
 
 **Status**: Resolved (2026-03-10)

@@ -15,9 +15,11 @@ const drawingsRoutes = require('./drawings');
 const voiceRoutes = require('./voice');
 const authRoutes = require('./auth');
 const { browserRoutes } = require('./browser');
+const gatewayRoutes = require('./gateway');
+const approvalsRoutes = require('./approvals');
 
 module.exports = function mountRoutes(app, services) {
-  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, cronService, memoryService, drawingService, config, authDB, browserManager } = services;
+  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, cronService, memoryService, drawingService, config, authDB, browserManager, openClawCLI } = services;
 
   // Auth routes (no auth required — handles its own)
   app.use('/api/auth', authRoutes(authDB, config));
@@ -49,4 +51,6 @@ module.exports = function mountRoutes(app, services) {
   app.use('/api/drawings', drawingsRoutes(drawingService));
   app.use('/api/voice', voiceRoutes(config));
   app.use('/api/browser', browserRoutes(browserManager));
+  app.use('/api/gateway', gatewayRoutes());
+  app.use('/api/approvals', approvalsRoutes(openClawCLI));
 };
