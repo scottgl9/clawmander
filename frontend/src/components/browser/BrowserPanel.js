@@ -13,6 +13,8 @@ export default function BrowserPanel({ instanceId }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const hiddenInputRef = useRef(null);
+  const touchStartRef = useRef(null);
+  const lastTouchRef = useRef(null);
   const [urlInput, setUrlInput] = useState('');
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [keyboardActive, setKeyboardActive] = useState(false);
@@ -101,17 +103,78 @@ export default function BrowserPanel({ instanceId }) {
     sendClick(x, y);
   }, [getNormalizedCoords, sendClick]);
 
-  // Touch support for mobile
-  const handleTouchEnd = useCallback((e) => {
-    if (e.changedTouches.length === 0) return;
-    const touch = e.changedTouches[0];
+  // Touch support for mobile — 2-finger scroll + single-finger tap-to-click
+  // Attached imperatively with { passive: false } so preventDefault works for scroll
+  const scrollSensitivity = 3;
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = (touch.clientX - rect.left) / rect.width;
-    const y = (touch.clientY - rect.top) / rect.height;
-    sendClick(x, y);
-  }, [sendClick]);
+
+    const onTouchStart = (e) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const mid = {
+          x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+          y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+        };
+        touchStartRef.current = { ...mid, time: Date.now(), isScroll: true };
+        lastTouchRef.current = mid;
+      } else if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now(), isScroll: false };
+      }
+    };
+
+    const onTouchMove = (e) => {
+      if (e.touches.length === 2 && lastTouchRef.current) {
+        e.preventDefault();
+        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        const deltaY = lastTouchRef.current.y - midY;
+        if (Math.abs(deltaY) > 2) {
+          const rect = canvas.getBoundingClientRect();
+          const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+          const normX = (midX - rect.left) / rect.width;
+          const normY = (midY - rect.top) / rect.height;
+          sendScroll(normX, normY, deltaY * scrollSensitivity);
+        }
+        lastTouchRef.current = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: midY };
+        if (touchStartRef.current) touchStartRef.current.isScroll = true;
+      }
+    };
+
+    const onTouchEnd = (e) => {
+      if (e.changedTouches.length === 0 || !touchStartRef.current) return;
+      const start = touchStartRef.current;
+      if (!start.isScroll) {
+        const touch = e.changedTouches[0];
+        const elapsed = Date.now() - start.time;
+        const dx = touch.clientX - start.x;
+        const dy = touch.clientY - start.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (elapsed < 500 && distance < 20) {
+          const rect = canvas.getBoundingClientRect();
+          const x = (touch.clientX - rect.left) / rect.width;
+          const y = (touch.clientY - rect.top) / rect.height;
+          sendClick(x, y);
+        }
+      }
+      if (e.touches.length === 0) {
+        touchStartRef.current = null;
+        lastTouchRef.current = null;
+      }
+    };
+
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd);
+
+    return () => {
+      canvas.removeEventListener('touchstart', onTouchStart);
+      canvas.removeEventListener('touchmove', onTouchMove);
+      canvas.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [sendScroll, sendClick]);
 
   const handleCanvasWheel = useCallback((e) => {
     e.preventDefault();
@@ -320,7 +383,6 @@ export default function BrowserPanel({ instanceId }) {
             ref={canvasRef}
             tabIndex={0}
             onClick={handleCanvasClick}
-            onTouchEnd={handleTouchEnd}
             onWheel={handleCanvasWheel}
             onMouseMove={handleCanvasMouseMove}
             onKeyDown={handleKeyDown}
