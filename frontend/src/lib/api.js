@@ -84,6 +84,12 @@ export const api = {
     getWorkItems: () => fetchJSON('/api/work/action-items/work'),
     getCompletedItems: () => fetchJSON('/api/work/action-items/completed'),
     getBrief: () => fetchJSON('/api/work/brief'),
+    getDailyTasks: () => fetchJSON('/api/work/daily-tasks'),
+    toggleDailyTask: (id, completed) => fetchJSON(`/api/work/daily-tasks/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer changeme' },
+      body: JSON.stringify({ completed }),
+    }),
   },
   budget: {
     getSummary: () => fetchJSON('/api/budget/summary'),
