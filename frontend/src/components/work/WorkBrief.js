@@ -98,7 +98,7 @@ export default function WorkBrief() {
     </div>
   );
 
-  const markdownContent = data.content || data.summary;
+  const markdownContent = (data.content || data.summary).replace(/\\n/g, '\n');
 
   return (
     <div className="bg-surface rounded-lg p-4 border border-gray-800">

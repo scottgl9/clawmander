@@ -1,5 +1,9 @@
 const express = require('express');
 
+function localDateStr() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+}
+
 module.exports = function (taskService, agentService, actionItemService) {
   const router = express.Router();
 
@@ -18,7 +22,7 @@ module.exports = function (taskService, agentService, actionItemService) {
 
   router.get('/daily', (req, res) => {
     const agents = agentService.getAll();
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateStr();
     
     // Get all action items, prioritize high-priority ones
     const allActionItems = actionItemService.getAll();

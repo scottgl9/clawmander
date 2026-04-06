@@ -2,6 +2,11 @@ const express = require('express');
 const { requireAuth } = require('../middleware/auth');
 const FileStore = require('../storage/FileStore');
 
+// Return YYYY-MM-DD in America/Chicago time
+function localDateStr() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+}
+
 module.exports = function (actionItemService) {
   const router = express.Router();
   const briefStore = new FileStore('daily-brief.json');
@@ -69,7 +74,7 @@ module.exports = function (actionItemService) {
   // Get daily brief
   router.get('/brief', (req, res) => {
     const briefs = briefStore.read();
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateStr();
     
     // Get today's brief or return default
     const todayBrief = briefs.find(b => b.date === today);
@@ -92,7 +97,7 @@ module.exports = function (actionItemService) {
   router.post('/brief', requireAuth, (req, res) => {
     const brief = {
       id: Date.now().toString(),
-      date: req.body.date || new Date().toISOString().split('T')[0],
+      date: req.body.date || localDateStr(),
       content: req.body.content || '',
       summary: req.body.summary || '',
       priorities: req.body.priorities || [],
@@ -115,7 +120,7 @@ module.exports = function (actionItemService) {
 
   // Get daily tasks
   router.get('/daily-tasks', (req, res) => {
-    const date = req.query.date || new Date().toISOString().split('T')[0];
+    const date = req.query.date || localDateStr();
     const tasks = dailyTasksStore.read();
     const dayTasks = tasks.filter(t => t.date === date);
     res.json(dayTasks);
@@ -124,7 +129,7 @@ module.exports = function (actionItemService) {
   // Create/update daily tasks
   router.post('/daily-tasks', requireAuth, (req, res) => {
     const { date, tasks } = req.body;
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetDate = date || localDateStr();
 
     if (!Array.isArray(tasks)) {
       return res.status(400).json({ error: 'tasks must be an array' });
@@ -167,7 +172,7 @@ module.exports = function (actionItemService) {
 
   // Clear all daily tasks for a specific date (or today if not specified)
   router.delete('/daily-tasks', requireAuth, (req, res) => {
-    const date = req.query.date || new Date().toISOString().split('T')[0];
+    const date = req.query.date || localDateStr();
     const allTasks = dailyTasksStore.read();
     const remainingTasks = allTasks.filter(t => t.date !== date);
     const removedCount = allTasks.length - remainingTasks.length;
