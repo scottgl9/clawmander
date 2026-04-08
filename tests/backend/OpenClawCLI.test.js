@@ -71,17 +71,22 @@ describe('OpenClawCLI', () => {
   });
 
   describe('readConfig', () => {
-    it('should parse JSON config', async () => {
-      const config = { tools: { exec: { security: 'full' } } };
-      execFile.mockImplementation((cmd, args, opts, cb) => cb(null, JSON.stringify(config), ''));
+    it('should parse agents + tools JSON config', async () => {
+      const agents = { list: [{ id: 'a1' }] };
+      const tools = { exec: { security: 'full' } };
+      execFile.mockImplementation((cmd, args, opts, cb) => {
+        if (args.includes('agents')) cb(null, JSON.stringify(agents), '');
+        else if (args.includes('tools')) cb(null, JSON.stringify(tools), '');
+        else cb(null, '', '');
+      });
       const result = await cli.readConfig();
-      expect(result).toEqual(config);
+      expect(result).toEqual({ agents, tools });
     });
 
-    it('should return empty object on error', async () => {
+    it('should return empty sub-objects when both fetches fail', async () => {
       execFile.mockImplementation((cmd, args, opts, cb) => cb(new Error('fail'), '', 'fail'));
       const result = await cli.readConfig();
-      expect(result).toEqual({});
+      expect(result).toEqual({ agents: {}, tools: {} });
     });
   });
 });
