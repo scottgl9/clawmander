@@ -1,0 +1,93 @@
+{
+  "name": "clawmander",
+  "version": "1.0.1",
+  "description": "Personal command center dashboard for OpenClaw agents — real-time chat, virtual browser, terminal, drawings, tasks, and more",
+  "license": "MIT",
+  "author": "Scott Glover",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/scottgl9/clawmander.git"
+  },
+  "homepage": "https://github.com/scottgl9/clawmander#readme",
+  "bugs": {
+    "url": "https://github.com/scottgl9/clawmander/issues"
+  },
+  "keywords": [
+    "openclaw",
+    "dashboard",
+    "ai-agents",
+    "chat",
+    "automation"
+  ],
+  "bin": {
+    "clawmander": "./bin/clawmander.js"
+  },
+  "files": [
+    "bin/",
+    "backend/server.js",
+    "backend/collectors/",
+    "backend/config/",
+    "backend/lib/",
+    "backend/middleware/",
+    "backend/models/",
+    "backend/routes/",
+    "backend/services/",
+    "backend/storage/AuthDB.js",
+    "backend/storage/FileStore.js",
+    "backend/storage/dataDir.js",
+    "backend/utils/",
+    "frontend/.next/server/",
+    "frontend/.next/static/",
+    "frontend/.next/BUILD_ID",
+    "frontend/.next/build-manifest.json",
+    "frontend/.next/prerender-manifest.json",
+    "frontend/.next/required-server-files.json",
+    "frontend/.next/routes-manifest.json",
+    "frontend/.next/react-loadable-manifest.json",
+    "frontend/.next/next-server.js.nft.json",
+    "frontend/.next/next-minimal-server.js.nft.json",
+    "frontend/public/",
+    "frontend/server.js",
+    "frontend/next.config.js",
+    "frontend/package.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "os": [
+    "linux"
+  ],
+  "scripts": {
+    "start": "node bin/clawmander.js start",
+    "stop": "node bin/clawmander.js stop",
+    "test": "cd backend && npx jest"
+  },
+  "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-web-links": "^0.12.0",
+    "@xterm/xterm": "^6.0.0",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.6.2",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.10.0",
+    "multer": "^2.1.1",
+    "next": "^14.2.0",
+    "next-pwa": "^5.6.0",
+    "node-pty": "^1.1.0",
+    "playwright": "^1.52.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "react-markdown": "^10.1.0",
+    "recharts": "^2.12.0",
+    "remark-gfm": "^4.0.1",
+    "uuid": "^9.0.1",
+    "ws": "^8.16.0"
+  }
+}

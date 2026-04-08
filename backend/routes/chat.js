@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 
 const SYSTEM_USERNAME = os.userInfo().username;
 const { EXEC_SUFFIX_RE, EXEC_ONLY_RE, stripExecSuffix } = require('../lib/execPatterns');
+const { dataPath } = require('../storage/dataDir');
 
 // Stable djb2-style hash — used to derive a deterministic message id from
 // (sessionKey, index, message content) so React keys stay stable across
@@ -122,9 +123,7 @@ module.exports = function (chatGatewayClient, chatService) {
     if (!upload) {
       try {
         const multer = require('multer');
-        const uploadDir = path.join(__dirname, '../storage/data/uploads');
-        const fs = require('fs');
-        if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+        const uploadDir = dataPath('uploads');
         upload = multer({ dest: uploadDir, limits: { fileSize: 10 * 1024 * 1024 } });
       } catch (e) {
         return null;
@@ -201,7 +200,7 @@ module.exports = function (chatGatewayClient, chatService) {
       // gateway receives self-contained image data rather than a local URL it can't fetch.
       const fs = require('fs');
       const MEDIA_TYPES = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' };
-      const uploadDir = path.join(__dirname, '../storage/data/uploads');
+      const uploadDir = dataPath('uploads');
 
       const resolvedAttachments = await Promise.all((attachments || []).map(async (att) => {
         const match = att.url && att.url.match(/^\/api\/chat\/uploads\/([^/]+)$/);

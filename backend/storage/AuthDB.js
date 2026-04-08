@@ -1,15 +1,11 @@
 const Database = require('better-sqlite3');
 const path = require('path');
-const fs = require('fs');
-
-const DATA_DIR = path.join(__dirname, 'data');
+const { getDataDir } = require('./dataDir');
 
 class AuthDB {
   constructor() {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    this.db = new Database(path.join(DATA_DIR, 'auth.db'));
+    const dataDir = getDataDir();
+    this.db = new Database(path.join(dataDir, 'auth.db'));
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('synchronous = NORMAL');
     this._initSchema();
