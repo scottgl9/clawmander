@@ -1,6 +1,6 @@
 {
   "name": "clawmander-backend",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Clawmander Dashboard Backend",
   "main": "server.js",
   "scripts": {

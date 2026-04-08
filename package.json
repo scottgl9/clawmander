@@ -1,6 +1,6 @@
 {
   "name": "clawmander",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Personal command center dashboard for OpenClaw agents — real-time chat, virtual browser, terminal, drawings, tasks, and more",
   "license": "MIT",
   "author": "Scott Glover",
