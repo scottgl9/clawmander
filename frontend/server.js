@@ -12,10 +12,13 @@ app.prepare().then(() => {
     handle(req, res, parse(req.url, true));
   });
 
-  // Proxy WebSocket upgrades for /ws/* to the backend on port 3001
+  // Proxy WebSocket upgrades for /ws/* to the backend.
+  // Port is configurable via BACKEND_PORT (set by the clawmander CLI when
+  // the user passes --backend-port); defaults to 3001.
+  const backendPort = parseInt(process.env.BACKEND_PORT, 10) || 3001;
   server.on('upgrade', (req, socket, head) => {
     if (req.url.startsWith('/ws/')) {
-      const backend = createConnection({ host: '127.0.0.1', port: 3001 }, () => {
+      const backend = createConnection({ host: '127.0.0.1', port: backendPort }, () => {
         backend.write(
           `GET ${req.url} HTTP/1.1\r\n` +
           Object.entries(req.headers)
