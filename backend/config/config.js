@@ -1,6 +1,13 @@
 const path = require('path');
 const os = require('os');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+// Prefer an explicit .env in the user data dir (set by the bin/clawmander.js
+// CLI for npm-installed deployments); fall back to the in-tree dev .env.
+const { getDataDir } = require('../storage/dataDir');
+const fs = require('fs');
+const _userEnv = path.join(getDataDir(), '.env');
+require('dotenv').config({
+  path: fs.existsSync(_userEnv) ? _userEnv : path.join(__dirname, '..', '..', '.env'),
+});
 
 module.exports = {
   port: parseInt(process.env.PORT || '3001', 10),

@@ -42,7 +42,8 @@ app.use(activityLogger);
 
 // Serve uploaded images
 const path = require('path');
-app.use('/api/chat/uploads', express.static(path.join(__dirname, 'storage/data/uploads')));
+const { dataPath } = require('./storage/dataDir');
+app.use('/api/chat/uploads', express.static(dataPath('uploads')));
 
 // Services
 const sseManager = new SSEManager();

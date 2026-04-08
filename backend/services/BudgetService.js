@@ -2,14 +2,14 @@ const FileStore = require('../storage/FileStore');
 const { createBudgetCategory } = require('../models/BudgetCategory');
 const { createTransaction } = require('../models/Transaction');
 const fs = require('fs');
-const path = require('path');
+const { dataPath } = require('../storage/dataDir');
 
 class BudgetService {
   constructor(sseManager) {
     this.categoriesStore = new FileStore('budget-categories.json');
     this.transactionsStore = new FileStore('budget-transactions.json');
     this.sse = sseManager;
-    this.incomeFilePath = path.join(__dirname, '../storage/data/monthly-income.json');
+    this.incomeFilePath = dataPath('monthly-income.json');
   }
 
   // Get monthly income from cache file

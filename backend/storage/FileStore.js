@@ -1,17 +1,21 @@
 const fs = require('fs');
 const path = require('path');
-
-const DATA_DIR = path.join(__dirname, 'data');
+const { getDataDir } = require('./dataDir');
 
 class FileStore {
   constructor(filename) {
-    this.filepath = path.join(DATA_DIR, filename);
+    this.filename = filename;
     this.cache = null;
   }
 
+  get filepath() {
+    return path.join(getDataDir(), this.filename);
+  }
+
   _ensureDir() {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
+    const dir = getDataDir();
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
   }
 

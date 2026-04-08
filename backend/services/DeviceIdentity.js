@@ -5,8 +5,9 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { dataPath } = require('../storage/dataDir');
 
-const IDENTITY_PATH = path.join(__dirname, '..', 'storage', 'data', 'device-identity.json');
+const IDENTITY_PATH = dataPath('device-identity.json');
 
 // ED25519 SPKI prefix (12 bytes)
 const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
