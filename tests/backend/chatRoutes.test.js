@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const chatRoutes = require('../../backend/routes/chat');
+const { stableGatewayMsgId } = require('../../backend/routes/chat');
 
 function createTestApp(mockGatewayClient, mockChatService) {
   const app = express();
@@ -213,5 +214,28 @@ describe('GET /api/chat/sessions', () => {
     expect(res.status).toBe(200);
     expect(res.body.sessions).toEqual(sessions);
     expect(res.body.connected).toBe(true);
+  });
+});
+
+describe('stableGatewayMsgId', () => {
+  test('is deterministic for identical inputs', () => {
+    const msg = { role: 'assistant', content: 'hello world', runId: 'run-1' };
+    const a = stableGatewayMsgId('agent:foo:bar', 3, msg);
+    const b = stableGatewayMsgId('agent:foo:bar', 3, msg);
+    expect(a).toBe(b);
+    expect(a).toMatch(/^gw-/);
+  });
+
+  test('differs when index or content differs', () => {
+    const msg = { role: 'assistant', content: 'hello', runId: 'r' };
+    const base = stableGatewayMsgId('s', 0, msg);
+    expect(stableGatewayMsgId('s', 1, msg)).not.toBe(base);
+    expect(stableGatewayMsgId('s', 0, { ...msg, content: 'hello!' })).not.toBe(base);
+    expect(stableGatewayMsgId('t', 0, msg)).not.toBe(base);
+  });
+
+  test('handles non-string content without throwing', () => {
+    const msg = { role: 'user', content: [{ type: 'text', text: 'hi' }] };
+    expect(() => stableGatewayMsgId('s', 0, msg)).not.toThrow();
   });
 });
