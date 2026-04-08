@@ -44,8 +44,8 @@ function get(app, path) {
 function createMockCLI(config = {}, approvalsData = {}) {
   return {
     readConfig: jest.fn().mockResolvedValue(config),
-    configSet: jest.fn().mockResolvedValue(''),
-    _exec: jest.fn().mockResolvedValue(JSON.stringify(approvalsData)),
+    configSetGlobal: jest.fn().mockResolvedValue(''),
+    _execGlobal: jest.fn().mockResolvedValue(JSON.stringify(approvalsData)),
   };
 }
 
@@ -92,8 +92,8 @@ describe('Approvals Routes', () => {
     const res = await request(app, 'PUT', '/api/approvals/defaults', { security: 'full', ask: 'always' });
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
-    expect(cli.configSet).toHaveBeenCalledWith('tools.exec.security', 'full');
-    expect(cli.configSet).toHaveBeenCalledWith('tools.exec.ask', 'always');
+    expect(cli.configSetGlobal).toHaveBeenCalledWith('tools.exec.security', 'full');
+    expect(cli.configSetGlobal).toHaveBeenCalledWith('tools.exec.ask', 'always');
   });
 
   test('PUT /api/approvals/agents/:id updates per-agent security', async () => {
@@ -103,7 +103,7 @@ describe('Approvals Routes', () => {
 
     const res = await request(app, 'PUT', '/api/approvals/agents/agent-1', { security: 'deny' });
     expect(res.status).toBe(200);
-    expect(cli.configSet).toHaveBeenCalledWith(
+    expect(cli.configSetGlobal).toHaveBeenCalledWith(
       'agents.list[0].tools.exec',
       JSON.stringify({ security: 'deny' }),
       true
@@ -124,7 +124,7 @@ describe('Approvals Routes', () => {
 
     const res = await request(app, 'POST', '/api/approvals/agents/agent-1/allowlist', { pattern: 'npm run *' });
     expect(res.status).toBe(201);
-    expect(cli._exec).toHaveBeenCalledWith(['approvals', 'allowlist', 'add', '--agent', 'agent-1', 'npm run *']);
+    expect(cli._execGlobal).toHaveBeenCalledWith(['approvals', 'allowlist', 'add', '--agent', 'agent-1', 'npm run *']);
   });
 
   test('POST /api/approvals/agents/:id/allowlist returns 400 without pattern', async () => {
@@ -144,7 +144,7 @@ describe('Approvals Routes', () => {
 
     const res = await request(app, 'DELETE', '/api/approvals/agents/agent-1/allowlist/entry-1');
     expect(res.status).toBe(200);
-    expect(cli._exec).toHaveBeenCalledWith(['approvals', 'allowlist', 'remove', '--agent', 'agent-1', 'npm *']);
+    expect(cli._execGlobal).toHaveBeenCalledWith(['approvals', 'allowlist', 'remove', '--agent', 'agent-1', 'npm *']);
   });
 
   test('DELETE /api/approvals/agents/:id/allowlist/:entryId returns 404 for unknown entry', async () => {
