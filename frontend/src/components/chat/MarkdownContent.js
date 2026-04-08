@@ -55,6 +55,20 @@ const components = {
   em: ({ children }) => <em className="italic text-gray-300">{children}</em>,
 };
 
+// Some models emit markdown tables on a single line (header, separator, and
+// first body row joined by whitespace). remark-gfm only recognizes them when
+// split across lines, so normalize that shape before parsing.
+function fixInlineTables(text) {
+  return text.replace(/^(.*\|[^|\n]*\|)\s+(\|[-:| ]+\|)\s+(\|.*)/gm, (_, header, sep, body) => {
+    const colCount = (header.match(/\|/g) || []).length - 1;
+    const fixedSep = colCount > 1 && sep === '|---|'
+      ? '|' + Array(colCount).fill('---').join('|') + '|'
+      : sep;
+    const rows = body.replace(/\|\s+\|/g, '|\n|');
+    return header + '\n' + fixedSep + '\n' + rows;
+  });
+}
+
 // While a message is streaming, delta chunks often leave structures
 // mid-construction: an unterminated ``` fence, a table without a trailing
 // blank line, a list whose items remark won't commit until the block ends.
@@ -69,7 +83,8 @@ function prepareStreamingContent(text) {
 
 export default function MarkdownContent({ content, streaming = false }) {
   if (!content) return null;
-  const source = streaming ? prepareStreamingContent(content) : content;
+  const fixed = fixInlineTables(content);
+  const source = streaming ? prepareStreamingContent(fixed) : fixed;
   return (
     <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
       {source}
