@@ -24,6 +24,7 @@ class ChatGatewayClient {
     this._challengeTimer = null;
     this._handshakeComplete = false;
     this._connected = false;
+    this._reconnectTimer = null;
 
     // Agent activity tracking
     // _knownAgents: agentId -> { id, name, lastSeen }
@@ -77,6 +78,10 @@ class ChatGatewayClient {
     if (this._challengeTimer) {
       clearTimeout(this._challengeTimer);
       this._challengeTimer = null;
+    }
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
     }
     if (this.ws) {
       this.ws.close();
@@ -208,8 +213,12 @@ class ChatGatewayClient {
 
   _scheduleReconnect() {
     if (!this.running) return;
+    if (this._reconnectTimer) return; // already scheduled
     console.log(`[Chat] Reconnecting in ${this.reconnectDelay / 1000}s...`);
-    setTimeout(() => this._connect(), this.reconnectDelay);
+    this._reconnectTimer = setTimeout(() => {
+      this._reconnectTimer = null;
+      this._connect();
+    }, this.reconnectDelay);
     this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
   }
 
