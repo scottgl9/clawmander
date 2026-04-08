@@ -71,7 +71,7 @@ export default function ChatMessage({ message, onSpeak, onRetry }) {
             ) : (
               <>
                 {message.content ? (
-                  <MarkdownContent content={message.content} />
+                  <MarkdownContent content={message.content} streaming={isStreaming} />
                 ) : isStreaming ? (
                   /* Empty streaming bubble — dots shown below, nothing in bubble */
                   null

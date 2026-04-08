@@ -6,6 +6,23 @@ const { v4: uuidv4 } = require('uuid');
 const SYSTEM_USERNAME = os.userInfo().username;
 const { EXEC_SUFFIX_RE, EXEC_ONLY_RE, stripExecSuffix } = require('../lib/execPatterns');
 
+// Stable djb2-style hash — used to derive a deterministic message id from
+// (sessionKey, index, message content) so React keys stay stable across
+// successive history reloads. Using Date.now() here causes bubbles to remount
+// on every reload, which resets streaming indicators and scroll position.
+function stableGatewayMsgId(sessionKey, index, msg) {
+  const role = (msg && msg.role) || '';
+  const c = msg && msg.content;
+  const contentStr = typeof c === 'string' ? c : (c ? JSON.stringify(c).slice(0, 512) : '');
+  const runId = (msg && msg.runId) || '';
+  const input = `${sessionKey}|${index}|${role}|${runId}|${contentStr}`;
+  let hash = 5381;
+  for (let i = 0; i < input.length; i++) {
+    hash = ((hash << 5) + hash + input.charCodeAt(i)) | 0;
+  }
+  return `gw-${(hash >>> 0).toString(36)}`;
+}
+
 // Normalize OpenClaw gateway chat.history response into Clawmander message format
 function normalizeGatewayHistory(result, sessionKey) {
   const raw = Array.isArray(result) ? result : (result?.messages || result?.items || result?.turns || []);
@@ -24,7 +41,7 @@ function normalizeGatewayHistory(result, sessionKey) {
       return true;
     })
     .map((msg, i) => ({
-      id: msg.id || `gw-${i}-${Date.now()}`,
+      id: msg.id || stableGatewayMsgId(sessionKey, i, msg),
       sessionKey,
       role: msg.role || 'assistant',
       content: extractGatewayText(msg),
@@ -278,3 +295,5 @@ module.exports = function (chatGatewayClient, chatService) {
 
   return router;
 };
+
+module.exports.stableGatewayMsgId = stableGatewayMsgId;
