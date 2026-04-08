@@ -33,6 +33,13 @@ export function useChatState() {
   const activeSessionRef = useRef(null);
   // Stable ref to loadHistory so handleSSEEvent ([] deps) can call it without stale closures
   const loadHistoryRef = useRef(null);
+  // Synchronous send-in-flight guard (per session) — prevents double-send
+  // on rapid submits where React `sending` state is still stale.
+  const sendingRef = useRef({});
+  // Per-session stale-stream watchdog timers: clears streaming state if no
+  // deltas arrive for STREAM_STALE_MS, so the UI doesn't hang on "...".
+  const streamTimeoutRef = useRef({});
+  const STREAM_STALE_MS = 90000;
 
   // Keep activeSessionRef in sync to avoid stale closures in SSE handler
   useEffect(() => { activeSessionRef.current = activeSession; }, [activeSession]);
@@ -43,7 +50,41 @@ export function useChatState() {
   const streamingRunId = activeSession ? (streamingRunIdMap[activeSession] || null) : null;
 
   const setSendingForSession = useCallback((sessionKey, value) => {
+    if (value) sendingRef.current[sessionKey] = true;
+    else delete sendingRef.current[sessionKey];
     setSendingMap(prev => ({ ...prev, [sessionKey]: value }));
+  }, []);
+
+  // Arm/reset the stale-stream watchdog for a session. Called on each delta
+  // so as long as the gateway keeps streaming, the timer never fires.
+  const resetStreamingTimeout = useCallback((sessionKey) => {
+    if (!sessionKey) return;
+    const existing = streamTimeoutRef.current[sessionKey];
+    if (existing) clearTimeout(existing);
+    streamTimeoutRef.current[sessionKey] = setTimeout(() => {
+      delete streamTimeoutRef.current[sessionKey];
+      // Watchdog fired — clear streaming + sending so the UI unsticks.
+      setStreamingContentMap((prev) => ({ ...prev, [sessionKey]: '' }));
+      setStreamingRunIdMap((prev) => ({ ...prev, [sessionKey]: null }));
+      delete sendingRef.current[sessionKey];
+      setSendingMap((prev) => ({ ...prev, [sessionKey]: false }));
+      setMessages((prev) => {
+        const sessionMsgs = prev[sessionKey] || [];
+        const updated = sessionMsgs.map((m) =>
+          m.state === 'streaming' ? { ...m, state: 'complete' } : m
+        );
+        return { ...prev, [sessionKey]: updated };
+      });
+    }, STREAM_STALE_MS);
+  }, []);
+
+  const clearStreamingTimeout = useCallback((sessionKey) => {
+    if (!sessionKey) return;
+    const existing = streamTimeoutRef.current[sessionKey];
+    if (existing) {
+      clearTimeout(existing);
+      delete streamTimeoutRef.current[sessionKey];
+    }
   }, []);
 
   // Load sessions + models
@@ -136,6 +177,7 @@ export function useChatState() {
         const { sessionKey, runId, text } = event.data;
         if (!text) break;
 
+        resetStreamingTimeout(sessionKey);
         streamingRef.current = { runId, content: text };
         setStreamingRunIdMap((prev) => ({ ...prev, [sessionKey]: runId }));
         setStreamingContentMap((prev) => ({ ...prev, [sessionKey]: text }));
@@ -177,6 +219,7 @@ export function useChatState() {
       }
       case 'chat.final': {
         const { sessionKey, runId, text } = event.data;
+        clearStreamingTimeout(sessionKey);
         streamingRef.current = { runId: null, content: '' };
         setStreamingRunIdMap((prev) => ({ ...prev, [sessionKey]: null }));
         setStreamingContentMap((prev) => ({ ...prev, [sessionKey]: '' }));
@@ -217,12 +260,14 @@ export function useChatState() {
           setTimeout(() => loadHistoryRef.current?.(sessionKey), 0);
           return prev;
         });
+        delete sendingRef.current[sessionKey];
         setSendingMap((prev) => ({ ...prev, [sessionKey]: false }));
         setTimeout(() => processQueueRef.current?.(sessionKey), 0);
         break;
       }
       case 'chat.error': {
         const { sessionKey, runId, error: errMsg } = event.data;
+        clearStreamingTimeout(sessionKey);
         streamingRef.current = { runId: null, content: '' };
         setStreamingRunIdMap((prev) => ({ ...prev, [sessionKey]: null }));
         setStreamingContentMap((prev) => ({ ...prev, [sessionKey]: '' }));
@@ -245,6 +290,7 @@ export function useChatState() {
           }
           return prev;
         });
+        delete sendingRef.current[sessionKey];
         setSendingMap((prev) => ({ ...prev, [sessionKey]: false }));
         setTimeout(() => processQueueRef.current?.(sessionKey), 0);
         setError(errMsg);
@@ -252,6 +298,7 @@ export function useChatState() {
       }
       case 'chat.aborted': {
         const { sessionKey, runId } = event.data;
+        clearStreamingTimeout(sessionKey);
         streamingRef.current = { runId: null, content: '' };
         setStreamingRunIdMap((prev) => ({ ...prev, [sessionKey]: null }));
         setStreamingContentMap((prev) => ({ ...prev, [sessionKey]: '' }));
@@ -266,6 +313,7 @@ export function useChatState() {
           // Clear queued messages on abort
           return { ...prev, [sessionKey]: updated.filter(m => m.state !== 'queued') };
         });
+        delete sendingRef.current[sessionKey];
         setSendingMap((prev) => ({ ...prev, [sessionKey]: false }));
         // Clear the queue for this session
         setMessageQueue(prev => ({ ...prev, [sessionKey]: [] }));
@@ -282,11 +330,17 @@ export function useChatState() {
         });
         break;
       case 'sse.reconnected':
-        // SSE dropped and reconnected — reload history to catch any missed events
+        // SSE dropped and reconnected — only reload history if a run is
+        // actually in flight. Unconditional reloads clobber in-flight
+        // streaming state and cause bubble flicker on idle reconnects.
         if (activeSessionRef.current) {
-          loadHistoryRef.current?.(activeSessionRef.current);
+          const hasInFlight =
+            !!streamingRef.current.runId ||
+            Object.values(sendingRef.current).some(Boolean);
+          if (hasInFlight) {
+            loadHistoryRef.current?.(activeSessionRef.current);
+          }
         }
-        setSendingMap({});
         break;
       default:
         break;
@@ -354,7 +408,7 @@ export function useChatState() {
       return handleSlashCommand(text.trim());
     }
 
-    if (sendingMap[activeSession]) {
+    if (sendingRef.current[activeSession] || sendingMap[activeSession]) {
       // Queue: add user message with state='queued', push to queue
       const queuedMsg = {
         id: `queued-user-${Date.now()}`,

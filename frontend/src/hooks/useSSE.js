@@ -6,6 +6,7 @@ export function useSSE(onEvent) {
   const esRef = useRef(null);
   const onEventRef = useRef(onEvent);
   const wasConnectedRef = useRef(false);
+  const retryDelayRef = useRef(3000);
   onEventRef.current = onEvent;
 
   const connect = useCallback(() => {
@@ -16,6 +17,7 @@ export function useSSE(onEvent) {
 
     es.onopen = () => {
       setConnected(true);
+      retryDelayRef.current = 3000; // reset backoff on successful open
       if (wasConnectedRef.current) {
         // SSE reconnected after a drop — notify listeners so they can reload stale data
         onEventRef.current({ type: 'sse.reconnected', data: {} });
@@ -25,7 +27,9 @@ export function useSSE(onEvent) {
     es.onerror = () => {
       setConnected(false);
       es.close();
-      setTimeout(connect, 3000);
+      const delay = retryDelayRef.current;
+      retryDelayRef.current = Math.min(delay * 2, 30000);
+      setTimeout(connect, delay);
     };
 
     const events = [

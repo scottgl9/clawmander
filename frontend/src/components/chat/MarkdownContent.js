@@ -55,11 +55,24 @@ const components = {
   em: ({ children }) => <em className="italic text-gray-300">{children}</em>,
 };
 
-export default function MarkdownContent({ content }) {
+// While a message is streaming, delta chunks often leave structures
+// mid-construction: an unterminated ``` fence, a table without a trailing
+// blank line, a list whose items remark won't commit until the block ends.
+// We close dangling fences and append a sentinel blank line so each delta
+// renders as completed blocks instead of swallowing subsequent content.
+function prepareStreamingContent(text) {
+  if (!text) return text;
+  const fenceCount = (text.match(/```/g) || []).length;
+  const closed = fenceCount % 2 === 1 ? text + '\n```' : text;
+  return closed + '\n\n';
+}
+
+export default function MarkdownContent({ content, streaming = false }) {
   if (!content) return null;
+  const source = streaming ? prepareStreamingContent(content) : content;
   return (
     <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-      {content}
+      {source}
     </ReactMarkdown>
   );
 }
