@@ -45,7 +45,7 @@ class SmsGatewayService {
 
   async registerWebhooks() {
     const callbackBase = `http://${this.callbackHost}:${this.callbackPort}${this.callbackPath}`;
-    const events = ['sms:received', 'mms:received'];
+    const events = ['sms:received', 'mms:received', 'mms:downloaded'];
 
     // Fetch already-registered webhooks to avoid duplicates
     let existing = [];
