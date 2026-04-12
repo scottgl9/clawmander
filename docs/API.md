@@ -1074,3 +1074,38 @@ DELETE /api/approvals/agents/:id/allowlist/:entryId
 
 ---
 
+### SMS/MMS Gateway
+
+See [SMS_GATEWAY.md](./SMS_GATEWAY.md) for full setup and architecture docs.
+
+#### Health
+```
+GET /api/sms/health
+```
+No auth. Returns phone reachability status and message count.
+
+#### List Messages
+```
+GET /api/sms/messages
+```
+Query params: `since` (ISO datetime), `limit` (default 50, max 500), `contact` (phone number), `type` (sms|mms|all).
+
+#### Get Message
+```
+GET /api/sms/messages/:id
+```
+
+#### Receive Webhook
+```
+POST /api/sms/webhook
+```
+No auth. Called by android-sms-gateway app. Handles `sms:received`, `mms:received`, `mms:downloaded`.
+
+#### Manual Sync
+```
+POST /api/sms/sync
+```
+Trigger manual pull from phone. Returns `{ new_messages, reachable }`.
+
+---
+
