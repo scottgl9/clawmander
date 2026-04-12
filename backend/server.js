@@ -19,6 +19,8 @@ const DrawingService = require('./services/DrawingService');
 const TerminalService = require('./services/TerminalService');
 const BrowserManager = require('./services/BrowserManager');
 const OpenClawCLI = require('./services/OpenClawCLI');
+const Message = require('./models/Message');
+const SmsGatewayService = require('./services/SmsGatewayService');
 const AuthDB = require('./storage/AuthDB');
 const { attachTerminalWS } = require('./routes/terminal');
 const { attachBrowserWS } = require('./routes/browser');
@@ -62,6 +64,8 @@ const drawingService = new DrawingService(sseManager);
 const terminalService = new TerminalService();
 const browserManager = new BrowserManager(sseManager, config);
 const openClawCLI = new OpenClawCLI(config.openClawHome);
+const messageModel = new Message();
+const smsGatewayService = new SmsGatewayService(messageModel);
 
 // Wire chat events into ChatService for message history tracking
 sseManager._origBroadcast = sseManager.broadcast.bind(sseManager);
@@ -75,7 +79,7 @@ sseManager.broadcast = function (event, data) {
 };
 
 // Routes
-mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, cronService, memoryService, drawingService, config, authDB, browserManager, openClawCLI });
+mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, cronService, memoryService, drawingService, config, authDB, browserManager, openClawCLI, smsGatewayService, messageModel });
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -186,6 +190,9 @@ cronService.startWatcher();
 cronService.reconcileStuckTasks();
 
 // Start server
+// Start SMS gateway (register webhooks + initial sync)
+smsGatewayService.startup().catch(err => console.error('[SMS] Gateway startup error:', err));
+
 const server = app.listen(config.port, '127.0.0.1', () => {
   console.log(`[Clawmander] Backend running on 127.0.0.1:${config.port}`);
   console.log(`[Clawmander] SSE endpoint: http://localhost:${config.port}/api/sse/subscribe`);
