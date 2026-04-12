@@ -47,7 +47,25 @@ class SmsGatewayService {
     const callbackBase = `http://${this.callbackHost}:${this.callbackPort}${this.callbackPath}`;
     const events = ['sms:received', 'mms:received'];
 
+    // Fetch already-registered webhooks to avoid duplicates
+    let existing = [];
+    try {
+      const res = await this._fetch('/webhooks');
+      if (res.ok) existing = await res.json();
+    } catch (err) {
+      console.warn('[SMS] Could not fetch existing webhooks:', err.message);
+    }
+    const alreadyRegistered = new Set(
+      existing
+        .filter(w => w.url === callbackBase)
+        .map(w => w.event)
+    );
+
     for (const event of events) {
+      if (alreadyRegistered.has(event)) {
+        console.log(`[SMS] Webhook already registered: ${event} -> ${callbackBase}`);
+        continue;
+      }
       try {
         const res = await this._fetch('/webhooks', {
           method: 'POST',
@@ -66,18 +84,21 @@ class SmsGatewayService {
   }
 
   normalizeMessage(payload) {
-    const type = payload.type || (payload.subject || payload.contentClass ? 'mms' : 'sms');
+    // android-sms-gateway wraps the actual message data in a 'payload' field
+    // when sending webhooks: { event, deviceId, id, payload: { messageId, sender, ... } }
+    const data = payload.payload || payload;
+    const type = data.type || (data.subject || data.contentClass ? 'mms' : 'sms');
     return {
-      id: payload.messageId || payload.id || uuidv4(),
+      id: data.messageId || data.id || payload.id || uuidv4(),
       type,
-      sender: payload.sender || payload.phoneNumber || payload.address || null,
-      recipient: payload.recipient || null,
-      body: payload.message || payload.body || payload.text || null,
-      subject: payload.subject || null,
-      size: payload.size || null,
-      content_class: payload.contentClass || payload.content_class || null,
-      sim_number: payload.simNumber || payload.sim_number || null,
-      received_at: payload.receivedAt || payload.date || null,
+      sender: data.sender || data.phoneNumber || data.address || null,
+      recipient: data.recipient || null,
+      body: data.message || data.body || data.text || null,
+      subject: data.subject || null,
+      size: data.size || null,
+      content_class: data.contentClass || data.content_class || null,
+      sim_number: data.simNumber || data.sim_number || null,
+      received_at: data.receivedAt || data.date || null,
       raw_payload: JSON.stringify(payload),
     };
   }

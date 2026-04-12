@@ -193,8 +193,9 @@ cronService.reconcileStuckTasks();
 // Start SMS gateway (register webhooks + initial sync)
 smsGatewayService.startup().catch(err => console.error('[SMS] Gateway startup error:', err));
 
-const server = app.listen(config.port, '127.0.0.1', () => {
-  console.log(`[Clawmander] Backend running on 127.0.0.1:${config.port}`);
+const bindHost = process.env.BIND_HOST || '127.0.0.1';
+const server = app.listen(config.port, bindHost, () => {
+  console.log(`[Clawmander] Backend running on ${bindHost}:${config.port}`);
   console.log(`[Clawmander] SSE endpoint: http://localhost:${config.port}/api/sse/subscribe`);
 });
 
