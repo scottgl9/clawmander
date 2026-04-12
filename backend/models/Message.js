@@ -30,6 +30,18 @@ class Message {
       CREATE INDEX IF NOT EXISTS idx_messages_received_at ON messages(received_at DESC);
       CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender);
     `);
+
+    // Add columns introduced for mms:downloaded support (safe to re-run)
+    const newCols = [
+      ['body_downloaded', 'TEXT'],
+      ['parts', 'TEXT'],
+      ['downloaded_at', 'DATETIME'],
+    ];
+    for (const [col, type] of newCols) {
+      try {
+        this.db.exec(`ALTER TABLE messages ADD COLUMN ${col} ${type}`);
+      } catch (_) { /* column already exists */ }
+    }
   }
 
   upsert(msg) {
@@ -75,6 +87,20 @@ class Message {
 
   getById(id) {
     return this.db.prepare('SELECT * FROM messages WHERE id = ?').get(id) || null;
+  }
+
+  updateMmsDownloaded(transactionId, { body, parts, downloadedAt }) {
+    const stmt = this.db.prepare(`
+      UPDATE messages SET body_downloaded=?, parts=?, downloaded_at=?
+      WHERE id=(
+        SELECT id FROM messages
+        WHERE json_extract(raw_payload, '$.payload.transactionId')=?
+           OR json_extract(raw_payload, '$.payload.messageId')=?
+        LIMIT 1
+      )
+    `);
+    const result = stmt.run(body, parts, downloadedAt, transactionId, transactionId);
+    return { updated: result.changes > 0 };
   }
 
   count() {

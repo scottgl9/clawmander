@@ -23,6 +23,21 @@ module.exports = function (smsGatewayService, messageModel) {
 
   // Webhook — NO AUTH, called by android-sms-gateway
   router.post('/webhook', (req, res) => {
+    const event = req.body?.event || '';
+
+    if (event === 'mms:downloaded') {
+      const data = req.body?.payload || req.body;
+      const result = messageModel.updateMmsDownloaded(
+        data.transactionId || data.messageId,
+        {
+          body: data.body || (data.parts?.find(p => p.contentType === 'text/plain')?.text) || null,
+          parts: data.parts ? JSON.stringify(data.parts) : null,
+          downloadedAt: data.receivedAt || new Date().toISOString(),
+        }
+      );
+      return res.json({ updated: result.updated });
+    }
+
     const normalized = smsGatewayService.normalizeMessage(req.body);
     const result = messageModel.upsert(normalized);
     res.json({ stored: result.inserted, id: result.id });
