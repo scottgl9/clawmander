@@ -3,10 +3,10 @@ const { v4: uuidv4 } = require('uuid');
 class SmsGatewayService {
   constructor(messageModel) {
     this.messageModel = messageModel;
-    this.asgUrl = process.env.ASG_URL || 'http://100.74.34.101:8080';
+    this.asgUrl = process.env.ASG_URL || 'http://localhost:8080';
     this.asgUser = process.env.ASG_USER || 'sms';
-    this.asgPass = process.env.ASG_PASS || 'ralmq5_o';
-    this.callbackHost = process.env.ASG_CALLBACK_HOST || '100.111.249.37';
+    this.asgPass = process.env.ASG_PASS || '';
+    this.callbackHost = process.env.ASG_CALLBACK_HOST || '127.0.0.1';
     this.callbackPort = process.env.ASG_CALLBACK_PORT || '3001';
     this.callbackPath = process.env.ASG_CALLBACK_PATH || '/api/sms/webhook';
   }
