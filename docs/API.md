@@ -501,6 +501,24 @@ Authorization: Bearer <token>
 Response 200: { "success": true }
 ```
 
+#### Reset Action Items By Category
+```
+DELETE /api/work/action-items?category=personal
+Authorization: Bearer <token>
+
+Response 200:
+{
+  "success": true,
+  "removedCount": 5,
+  "category": "personal"
+}
+```
+
+Also supports:
+- `DELETE /api/work/action-items?category=work`
+
+This bulk reset is intended for daily shortlist refresh flows. It removes all action items in the given category so a fresh current-day set can be posted.
+
 ---
 
 ### Daily Brief

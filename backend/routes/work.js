@@ -71,6 +71,15 @@ module.exports = function (actionItemService) {
     res.json({ success: true });
   });
 
+  router.delete('/action-items', requireAuth, (req, res) => {
+    const { category } = req.query;
+    if (!category) {
+      return res.status(400).json({ error: 'category query param is required' });
+    }
+    const result = actionItemService.deleteByCategory(category);
+    res.json(result);
+  });
+
   // Get daily brief
   router.get('/brief', (req, res) => {
     const briefs = briefStore.read();
