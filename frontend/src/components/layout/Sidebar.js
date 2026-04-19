@@ -94,6 +94,15 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: '/sms',
+    label: 'SMS / MMS',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 10.5h9m-9 3h5.25M6.75 19.5h10.5A2.25 2.25 0 0019.5 17.25V6.75A2.25 2.25 0 0017.25 4.5H6.75A2.25 2.25 0 004.5 6.75v10.5A2.25 2.25 0 006.75 19.5z" />
+      </svg>
+    ),
+  },
+  {
     href: '/budget',
     label: 'Budget',
     icon: (
