@@ -89,18 +89,36 @@ class Message {
     return this.db.prepare('SELECT * FROM messages WHERE id = ?').get(id) || null;
   }
 
-  updateMmsDownloaded(transactionId, { body, parts, downloadedAt }) {
-    const stmt = this.db.prepare(`
-      UPDATE messages SET body_downloaded=?, parts=?, downloaded_at=?
-      WHERE id=(
-        SELECT id FROM messages
-        WHERE json_extract(raw_payload, '$.payload.transactionId')=?
-           OR json_extract(raw_payload, '$.payload.messageId')=?
-        LIMIT 1
+  updateMmsDownloaded(transactionId, { body, parts, downloadedAt, rawPayload }) {
+    const candidate = this.db.prepare(`
+      SELECT id, json_extract(raw_payload, '$.payload.transactionId') AS stored_transaction_id,
+             json_extract(raw_payload, '$.payload.messageId') AS stored_message_id
+      FROM messages
+      WHERE type = 'mms' AND (
+        id = ?
+        OR json_extract(raw_payload, '$.payload.transactionId') = ?
+        OR json_extract(raw_payload, '$.payload.messageId') = ?
       )
+      ORDER BY received_at DESC
+      LIMIT 1
+    `).get(transactionId, transactionId, transactionId);
+
+    if (!candidate) {
+      return { updated: false, reason: 'no_match', transactionId };
+    }
+
+    const stmt = this.db.prepare(`
+      UPDATE messages SET body_downloaded=?, parts=?, downloaded_at=?, raw_payload=?
+      WHERE id=?
     `);
-    const result = stmt.run(body, parts, downloadedAt, transactionId, transactionId);
-    return { updated: result.changes > 0 };
+    const mergedPayload = rawPayload || this.getById(candidate.id)?.raw_payload || null;
+    const result = stmt.run(body, parts, downloadedAt, mergedPayload, candidate.id);
+    return {
+      updated: result.changes > 0,
+      matchedId: candidate.id,
+      storedTransactionId: candidate.stored_transaction_id,
+      storedMessageId: candidate.stored_message_id,
+    };
   }
 
   count() {
