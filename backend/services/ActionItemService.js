@@ -65,6 +65,19 @@ class ActionItemService {
     }
     return removed;
   }
+
+  deleteByCategory(category) {
+    const items = this.getAll(category);
+    let removedCount = 0;
+    for (const item of items) {
+      const removed = this.store.remove(item.id);
+      if (removed) {
+        removedCount += 1;
+        this.sse.broadcast('actionitem.deleted', { id: item.id });
+      }
+    }
+    return { success: true, removedCount, category };
+  }
 }
 
 module.exports = ActionItemService;

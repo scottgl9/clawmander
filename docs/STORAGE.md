@@ -80,6 +80,11 @@ Since there are no database-level unique constraints, deduplication is enforced 
 - Same title in same category = same item → update in place
 - Used by `POST /api/work/action-items`
 
+### ActionItemService.deleteByCategory()
+- Bulk removes all action items in a category
+- Used by `DELETE /api/work/action-items?category=personal|work`
+- Intended for daily shortlist reset flows before posting the new current-day set
+
 ### AgentService.upsert()
 - **Dedup key**: `id`
 - Pre-existing pattern, used by heartbeat/status flows
