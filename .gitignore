@@ -140,10 +140,11 @@ vite.config.ts.timestamp-*
 
 # Clawmander data files
 backend/storage/data/*.json
-backend/storage/data/*.db
-backend/storage/data/*.db-wal
-backend/storage/data/*.db-shm
 backend/storage/data/
+*.sqlite
+*.db
+*.db-wal
+*.db-shm
 
 # Next.js generated service worker / workbox files
 frontend/public/sw.js
