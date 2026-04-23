@@ -28,15 +28,19 @@ module.exports = function (smsGatewayService, messageModel) {
 
     if (event === 'mms:downloaded') {
       const lookupId = data.transactionId || data.messageId;
-      const body = data.body || (data.parts?.find?.(p => p.contentType === 'text/plain')?.text) || null;
-      const parts = data.parts ? JSON.stringify(data.parts) : null;
+      const attachmentParts = data.parts || data.attachments || null;
+      const body = data.body
+        || attachmentParts?.find?.(p => p.contentType === 'text/plain')?.text
+        || null;
+      const parts = attachmentParts ? JSON.stringify(attachmentParts) : null;
       console.log('[SMS] webhook mms:downloaded', {
         lookupId,
         messageId: data.messageId || null,
         transactionId: data.transactionId || null,
         subject: data.subject || null,
         hasBody: !!body,
-        partsCount: Array.isArray(data.parts) ? data.parts.length : 0,
+        partsCount: Array.isArray(attachmentParts) ? attachmentParts.length : 0,
+        payloadShape: data.parts ? 'parts' : (data.attachments ? 'attachments' : 'none'),
       });
       const result = messageModel.updateMmsDownloaded(
         lookupId,
