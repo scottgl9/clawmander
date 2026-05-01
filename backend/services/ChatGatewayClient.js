@@ -327,6 +327,12 @@ class ChatGatewayClient {
       case 'chat':
         this._handleChatEvent(payload || {});
         break;
+      case 'exec.approval.requested':
+        this._handleExecApprovalRequested(payload || {});
+        break;
+      case 'exec.approval.resolved':
+        this._handleExecApprovalResolved(payload || {});
+        break;
       // Agent lifecycle events — two formats the gateway may use:
       // 1. top-level 'start'/'end'/'error' events (have agentId field)
       // 2. 'agent' event with stream='lifecycle' + data.phase (extract agentId from sessionKey)
@@ -353,6 +359,44 @@ class ChatGatewayClient {
       default:
         break;
     }
+  }
+
+  _handleExecApprovalRequested(payload) {
+    const request = payload.request || {};
+    const systemRunPlan = request.systemRunPlan || {};
+    const approval = {
+      approvalId: payload.id || payload.approvalId || request.id || null,
+      sessionKey: request.sessionKey || systemRunPlan.sessionKey || null,
+      command: request.commandPreview || systemRunPlan.commandPreview || request.command || systemRunPlan.commandText || '',
+      commandText: request.command || systemRunPlan.commandText || request.commandPreview || '',
+      cwd: request.cwd || systemRunPlan.cwd || null,
+      host: request.host || null,
+      nodeId: request.nodeId || null,
+      agentId: request.agentId || systemRunPlan.agentId || null,
+      warningText: request.warningText || null,
+      allowedDecisions: Array.isArray(request.allowedDecisions) ? request.allowedDecisions : ['allow-once', 'deny'],
+      createdAtMs: payload.createdAtMs || null,
+      expiresAtMs: payload.expiresAtMs || null,
+      state: 'pending',
+    };
+
+    if (!approval.approvalId) return;
+    this.sse.broadcast('chat.approval', approval);
+  }
+
+  _handleExecApprovalResolved(payload) {
+    const request = payload.request || {};
+    const systemRunPlan = request.systemRunPlan || {};
+    const approval = {
+      approvalId: payload.id || payload.approvalId || null,
+      sessionKey: request.sessionKey || systemRunPlan.sessionKey || null,
+      decision: payload.decision || null,
+      resolvedBy: payload.resolvedBy || null,
+      state: 'resolved',
+    };
+
+    if (!approval.approvalId) return;
+    this.sse.broadcast('chat.approval.resolved', approval);
   }
 
   // Extract agentId from a session key like agent:<agentId>:<label> or clawmander:<agentId>:<label>
