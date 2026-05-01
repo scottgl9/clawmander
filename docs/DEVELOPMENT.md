@@ -141,6 +141,8 @@ useSSE((event) => {
 });
 ```
 
+When adding frontend-consumed SSE events, also add the event name to the listener array in `frontend/src/hooks/useSSE.js`. Chat exec approvals use `chat.approval` and `chat.approval.resolved`; approval UI actions must send OpenClaw decisions (`allow-once` or `deny`), not display labels like `approve`.
+
 ### Working with FileStore
 
 **Read**:

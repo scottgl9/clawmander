@@ -26,10 +26,10 @@ export default function ApprovalBanner({ approval, onResolved }) {
         </div>
         <div className="flex gap-2 flex-shrink-0">
           <button
-            onClick={() => handle('approve')}
+            onClick={() => handle('allow-once')}
             className="px-3 py-1 bg-green-700 hover:bg-green-600 text-white text-xs rounded font-medium transition-colors"
           >
-            Approve
+            Approve Once
           </button>
           <button
             onClick={() => handle('deny')}

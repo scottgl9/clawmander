@@ -29,6 +29,38 @@ function request(app, path) {
   });
 }
 
+function requestJson(app, method, path, payload) {
+  return new Promise((resolve, reject) => {
+    const server = app.listen(0, () => {
+      const port = server.address().port;
+      const body = JSON.stringify(payload || {});
+      const req = http.request({
+        hostname: '127.0.0.1',
+        port,
+        path,
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+        },
+      }, (res) => {
+        let responseBody = '';
+        res.on('data', (chunk) => { responseBody += chunk; });
+        res.on('end', () => {
+          server.close();
+          resolve({ status: res.statusCode, body: JSON.parse(responseBody) });
+        });
+      });
+      req.on('error', (err) => {
+        server.close();
+        reject(err);
+      });
+      req.write(body);
+      req.end();
+    });
+  });
+}
+
 function createMockGatewayClient(overrides = {}) {
   return {
     connected: true,
@@ -214,6 +246,50 @@ describe('GET /api/chat/sessions', () => {
     expect(res.status).toBe(200);
     expect(res.body.sessions).toEqual(sessions);
     expect(res.body.connected).toBe(true);
+  });
+});
+
+describe('POST /api/chat/approval/resolve', () => {
+  test('forwards allow-once approval decisions to the gateway', async () => {
+    const mockGateway = createMockGatewayClient();
+    const app = createTestApp(mockGateway, createMockChatService());
+
+    const res = await requestJson(app, 'POST', '/api/chat/approval/resolve', {
+      approvalId: 'approval-123',
+      decision: 'allow-once',
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(mockGateway.resolveApproval).toHaveBeenCalledWith('approval-123', 'allow-once');
+  });
+
+  test('forwards deny approval decisions to the gateway', async () => {
+    const mockGateway = createMockGatewayClient();
+    const app = createTestApp(mockGateway, createMockChatService());
+
+    const res = await requestJson(app, 'POST', '/api/chat/approval/resolve', {
+      approvalId: 'approval-123',
+      decision: 'deny',
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(mockGateway.resolveApproval).toHaveBeenCalledWith('approval-123', 'deny');
+  });
+
+  test('rejects invalid approval decision strings', async () => {
+    const mockGateway = createMockGatewayClient();
+    const app = createTestApp(mockGateway, createMockChatService());
+
+    const res = await requestJson(app, 'POST', '/api/chat/approval/resolve', {
+      approvalId: 'approval-123',
+      decision: 'approve',
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('decision must be allow-once or deny');
+    expect(mockGateway.resolveApproval).not.toHaveBeenCalled();
   });
 });
 

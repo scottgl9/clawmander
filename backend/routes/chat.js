@@ -270,6 +270,9 @@ module.exports = function (chatGatewayClient, chatService) {
     if (!approvalId || !decision) {
       return res.status(400).json({ error: 'approvalId and decision are required' });
     }
+    if (!['allow-once', 'deny'].includes(decision)) {
+      return res.status(400).json({ error: 'decision must be allow-once or deny' });
+    }
     try {
       const result = await chatGatewayClient.resolveApproval(approvalId, decision);
       res.json({ ok: true, result });

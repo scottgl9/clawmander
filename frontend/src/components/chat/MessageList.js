@@ -3,7 +3,7 @@ import ChatMessage from './ChatMessage';
 
 const BOTTOM_THRESHOLD = 100;
 
-export default function MessageList({ messages, loading, onSpeak, onRetry }) {
+export default function MessageList({ messages, loading, onSpeak, onRetry, onResolveApproval }) {
   const containerRef = useRef(null);
   const bottomRef = useRef(null);
   const isAtBottomRef = useRef(true);
@@ -59,7 +59,13 @@ export default function MessageList({ messages, loading, onSpeak, onRetry }) {
         className="h-full overflow-y-auto overflow-x-hidden py-4 space-y-0"
       >
         {messages.map((msg) => (
-          <ChatMessage key={msg.id} message={msg} onSpeak={onSpeak} onRetry={onRetry} />
+          <ChatMessage
+            key={msg.id}
+            message={msg}
+            onSpeak={onSpeak}
+            onRetry={onRetry}
+            onResolveApproval={onResolveApproval}
+          />
         ))}
         <div ref={bottomRef} />
       </div>
