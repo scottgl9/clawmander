@@ -12,7 +12,8 @@ module.exports = function (budgetService) {
 
   router.get('/trends', (req, res) => {
     const months = parseInt(req.query.months || '6', 10);
-    res.json(budgetService.getTrends(months));
+    const endMonth = req.query.endMonth;
+    res.json(budgetService.getTrends(months, endMonth));
   });
 
   router.get('/categories', (req, res) => {
@@ -35,6 +36,16 @@ module.exports = function (budgetService) {
     const transaction = budgetService.getTransactionById(req.params.id);
     if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
     res.json(transaction);
+  });
+
+  router.get('/status', (req, res) => {
+    const month = req.query.month;
+    res.json(budgetService.getStatus(month));
+  });
+
+  router.get('/balances', (req, res) => {
+    const month = req.query.month;
+    res.json(budgetService.getBalances(month));
   });
 
   // Upcoming bills
@@ -90,6 +101,17 @@ module.exports = function (budgetService) {
     const removed = budgetService.deleteTransaction(req.params.id);
     if (!removed) return res.status(404).json({ error: 'Transaction not found' });
     res.json({ success: true });
+  });
+
+  router.patch('/status', requireAuth, (req, res) => {
+    const updated = budgetService.upsertStatus(req.body || {});
+    res.json(updated);
+  });
+
+  router.patch('/balances', requireAuth, (req, res) => {
+    const month = req.body && req.body.month;
+    const updated = budgetService.upsertBalances(month, req.body || {});
+    res.json(updated);
   });
 
   return router;

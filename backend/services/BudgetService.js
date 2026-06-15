@@ -4,10 +4,32 @@ const { createTransaction } = require('../models/Transaction');
 const fs = require('fs');
 const { dataPath } = require('../storage/dataDir');
 
+const toNumber = (value) => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+};
+
+const parseMonthKey = (monthKey) => {
+  if (typeof monthKey !== 'string' || !/^\d{4}-\d{2}$/.test(monthKey)) return null;
+  const [yearRaw, monthRaw] = monthKey.split('-');
+  const year = Number(yearRaw);
+  const monthIndex = Number(monthRaw) - 1;
+  if (!Number.isInteger(year) || !Number.isInteger(monthIndex) || monthIndex < 0 || monthIndex > 11) {
+    return null;
+  }
+  return new Date(year, monthIndex, 1);
+};
+
 class BudgetService {
   constructor(sseManager) {
     this.categoriesStore = new FileStore('budget-categories.json');
     this.transactionsStore = new FileStore('budget-transactions.json');
+    this.statusStore = new FileStore('budget-status.json');
+    this.balancesStore = new FileStore('budget-balances.json');
     this.sse = sseManager;
     this.incomeFilePath = dataPath('monthly-income.json');
   }
@@ -41,6 +63,58 @@ class BudgetService {
     return this.categoriesStore.findById(id);
   }
 
+  getStatus(month) {
+    const statuses = this.statusStore.read();
+    const currentMonth = month || new Date().toISOString().slice(0, 7);
+    return statuses.find((s) => s.month === currentMonth) || statuses.find((s) => s.month === undefined) || null;
+  }
+
+  upsertStatus(updates) {
+    const currentMonth = updates.month || new Date().toISOString().slice(0, 7);
+    const statuses = this.statusStore.read();
+    const idx = statuses.findIndex((s) => s.month === currentMonth);
+    const payload = {
+      ...((idx >= 0 && statuses[idx]) || {}),
+      ...updates,
+      month: currentMonth,
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (idx >= 0) {
+      statuses[idx] = payload;
+    } else {
+      statuses.push(payload);
+    }
+
+    this.statusStore.write(statuses);
+    return payload;
+  }
+
+  getBalances(month) {
+    const balances = this.balancesStore.read();
+    const currentMonth = month || new Date().toISOString().slice(0, 7);
+    return balances.find((b) => b.month === currentMonth) || balances.find((b) => b.month === undefined) || null;
+  }
+
+  upsertBalances(month, updates) {
+    const currentMonth = month || new Date().toISOString().slice(0, 7);
+    const rows = this.balancesStore.read();
+    const idx = rows.findIndex((b) => b.month === currentMonth);
+    const payload = {
+      ...((idx >= 0 && rows[idx]) || {}),
+      ...updates,
+      month: currentMonth,
+      updatedAt: new Date().toISOString(),
+    };
+    if (idx >= 0) {
+      rows[idx] = payload;
+    } else {
+      rows.push(payload);
+    }
+    this.balancesStore.write(rows);
+    return payload;
+  }
+
   createCategory(data) {
     const category = createBudgetCategory(data);
     this.categoriesStore.insert(category);
@@ -67,15 +141,42 @@ class BudgetService {
   getSummary(month) {
     const currentMonth = month || new Date().toISOString().slice(0, 7);
     const categories = this.getAllCategories(currentMonth);
+    const status = this.getStatus(currentMonth);
 
-    const totalBudget = categories.reduce((sum, c) => sum + c.budget, 0);
-    const totalSpent = categories.reduce((sum, c) => sum + c.spent, 0);
+    const kindOf = (cat) => {
+      if (!cat || !cat.name) return 'variable';
+      return (cat.metadata && cat.metadata.budgetKind) || (
+        cat.name === 'Fixed Expenses' ? 'fixed' :
+        (cat.name === 'Transfer-Internal' || cat.name === 'Transfer-External') ? 'transfer' :
+        cat.name === 'Financial' ? 'financial' :
+        cat.name === 'Income' ? 'income' : 'variable'
+      );
+    };
+
+    const fixed = categories.filter((cat) => kindOf(cat) === 'fixed');
+    const variable = categories.filter((cat) => kindOf(cat) === 'variable');
+    const transfer = categories.filter((cat) => kindOf(cat) === 'transfer');
+    const financial = categories.filter((cat) => kindOf(cat) === 'financial');
+    const incomeCats = categories.filter((cat) => kindOf(cat) === 'income');
+
+    const sumByKind = (list, key) => list.reduce((sum, c) => sum + toNumber(c[key]), 0);
+    const fixedBudget = sumByKind(fixed, 'budget');
+    const fixedSpent = sumByKind(fixed, 'spent');
+    const variableBudget = sumByKind(variable, 'budget');
+    const variableSpent = sumByKind(variable, 'spent');
+    const totalBudget = fixedBudget + variableBudget;
+    const totalSpent = fixedSpent + variableSpent;
+    const remaining = totalBudget - totalSpent;
 
     // Helper to round to 2 decimal places
     const round2 = (num) => Math.round(num * 100) / 100;
 
     // Get actual monthly income from cache
     const monthlyIncome = this.getMonthlyIncome(currentMonth);
+    const statusTotals = (status && status.totals) || {};
+    const projectedNetEOM = statusTotals.projectedNetEOM !== undefined && statusTotals.projectedNetEOM !== null
+      ? round2(toNumber(statusTotals.projectedNetEOM))
+      : null;
     const netCashFlow = round2(monthlyIncome - totalSpent);
     const isPositive = netCashFlow > 0;
 
@@ -83,23 +184,54 @@ class BudgetService {
     const [yearNum, monthNum] = currentMonth.split('-');
     const monthDate = new Date(parseInt(yearNum), parseInt(monthNum) - 1, 1);
     
+    const variableStatus = statusTotals.variablePaceRatio !== undefined ? statusTotals.variablePaceRatio : null;
+
     return {
       month: currentMonth,
       monthName: monthDate.toLocaleString('default', { month: 'long', year: 'numeric' }),
       totalBudget: round2(totalBudget),
       totalSpent: round2(totalSpent),
-      remaining: round2(totalBudget - totalSpent),
+      remaining: round2(remaining),
+      fixedBudget: round2(fixedBudget),
+      variableBudget: round2(variableBudget),
+      fixedSpent: round2(fixedSpent),
+      variableSpent: round2(variableSpent),
+      variableRemaining: round2(statusTotals.variableRemaining !== undefined ? toNumber(statusTotals.variableRemaining) : (variableBudget - variableSpent)),
+      variablePaceRatio: variableStatus,
+      projectedNetEom: projectedNetEOM,
       income: round2(monthlyIncome),
       netCashFlow: netCashFlow,
       isPositive: isPositive,
       savingsRate: monthlyIncome > 0 ? round2((netCashFlow / monthlyIncome) * 100) : 0,
+      sourceStatus: status ? (status.sourceStatus || {}) : {},
+      dataFreshness: {
+        sourceGeneratedAt: status ? status.sourceGeneratedAt : null,
+        syncedAt: status ? status.syncedAt : null,
+        uncategorizedCount: status && status.uncategorizedCount !== undefined ? status.uncategorizedCount : 0,
+        source: status ? status.source : 'budget-agent',
+      },
+      alerts: status ? status.alerts || [] : [],
+      balances: this.getBalances(currentMonth),
+      budgetsByKind: {
+        fixed: round2(fixedBudget),
+        variable: round2(variableBudget),
+        transfer: round2(sumByKind(transfer, 'budget')),
+        financial: round2(sumByKind(financial, 'budget')),
+        income: round2(sumByKind(incomeCats, 'budget')),
+      },
       categories: categories.map(c => ({
         id: c.id,
         name: c.name,
         budget: round2(c.budget),
         spent: round2(c.spent),
+        budgetKind: kindOf(c),
+        paceRatio: c.metadata && c.metadata.paceRatio !== undefined ? c.metadata.paceRatio : null,
+        projectedEom: c.metadata && c.metadata.projectedEom !== undefined ? c.metadata.projectedEom : null,
+        pctOfTarget: c.metadata && c.metadata.pctOfTarget !== undefined ? c.metadata.pctOfTarget : null,
+        overBudget: c.metadata && typeof c.metadata.overBudget === 'boolean' ? c.metadata.overBudget : null,
         remaining: round2(c.budget - c.spent),
         percentage: c.budget > 0 ? Math.round((c.spent / c.budget) * 100) : 0,
+        note: c.metadata && c.metadata.note ? c.metadata.note : '',
       })),
     };
   }
@@ -203,25 +335,28 @@ class BudgetService {
     return removed;
   }
 
-  getTrends(months = 6) {
+  getTrends(months = 6, endMonth) {
     const result = [];
-    const now = new Date();
+    const anchorDate = parseMonthKey(endMonth) || new Date();
 
     // Helper to round to 2 decimal places
     const round2 = (num) => Math.round(num * 100) / 100;
 
     for (let i = months - 1; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const date = new Date(anchorDate.getFullYear(), anchorDate.getMonth() - i, 1);
       const monthKey = date.toISOString().slice(0, 7);
-      const categories = this.getAllCategories(monthKey);
+      const summary = this.getSummary(monthKey);
+      const status = this.getStatus(monthKey);
+      const totalBudget = summary.totalBudget;
+      const totalSpent = summary.totalSpent;
 
-      const totalBudget = categories.reduce((sum, c) => sum + c.budget, 0);
-      const totalSpent = categories.reduce((sum, c) => sum + c.spent, 0);
-      
       // Get actual monthly income from cache
-      const monthlyIncome = this.getMonthlyIncome(monthKey);
+      const monthlyIncome = summary.income;
       const netCashFlow = round2(monthlyIncome - totalSpent);
       const isPositive = netCashFlow > 0;
+      const projectedNetEOM = summary.projectedNetEom;
+      const statusMonth = monthKey;
+      const isProjected = statusMonth === new Date().toISOString().slice(0, 7) && projectedNetEOM !== null;
 
       result.push({
         month: date.toLocaleString('default', { month: 'short' }),
@@ -233,6 +368,9 @@ class BudgetService {
         netCashFlow: netCashFlow,
         isPositive: isPositive,
         savingsRate: monthlyIncome > 0 ? round2((netCashFlow / monthlyIncome) * 100) : 0,
+        isProjected,
+        projectedNetEom: projectedNetEOM,
+        sourceStatus: status ? status.sourceStatus || {} : {},
       });
     }
 
