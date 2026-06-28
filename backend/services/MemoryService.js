@@ -3,6 +3,7 @@ const path = require('path');
 
 const AGENT_PATHS = {
   'work-agent': '~/.openclaw/workspace/memory',
+  'general-agent': '~/.openclaw/workspace-general/memory',
   'personal-agent': '~/.openclaw/workspace-personal/memory',
   'sentinel-work': '~/.openclaw/workspace/agents/sentinel-work/memory',
   'budget': '~/.openclaw/workspace-personal/agents/budget/memory',
