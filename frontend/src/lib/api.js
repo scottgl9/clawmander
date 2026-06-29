@@ -109,6 +109,10 @@ export const api = {
       return fetchJSON(`/api/budget/status${qs ? `?${qs}` : ''}`);
     },
     getUpcomingBills: () => fetchJSON('/api/budget/upcoming-bills'),
+    getSubscriptions: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return fetchJSON(`/api/budget/subscriptions${qs ? `?${qs}` : ''}`);
+    },
     getBalances: (params = {}) => {
       const qs = new URLSearchParams(params).toString();
       return fetchJSON(`/api/budget/balances${qs ? `?${qs}` : ''}`);

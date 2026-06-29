@@ -7,6 +7,7 @@ import { api } from '../lib/api';
 import ProgressBar from '../components/shared/ProgressBar';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import BudgetDetailModal from '../components/budget/BudgetDetailModal';
+import Subscriptions from '../components/budget/Subscriptions';
 
 function badgeClass(kind = 'variable') {
   if (kind === 'fixed') return 'bg-emerald-500/20 text-emerald-300';
@@ -87,6 +88,10 @@ export default function BudgetPage() {
   );
   const { data: balances } = useAPI(
     () => api.budget.getBalances({ month: selectedMonth }),
+    [selectedMonth],
+  );
+  const { data: subscriptions } = useAPI(
+    () => api.budget.getSubscriptions({ month: selectedMonth }),
     [selectedMonth],
   );
 
@@ -280,6 +285,8 @@ export default function BudgetPage() {
               </div>
             </div>
 
+            <Subscriptions data={subscriptions} />
+
             {trends && trends.length > 0 && (
               <div className="bg-surface rounded-lg p-4 sm:p-6 border border-gray-800">
                 <h3 className="text-sm font-semibold text-white mb-4">6-Month Cash Flow</h3>
@@ -291,6 +298,7 @@ export default function BudgetPage() {
                         <th className="text-left py-2 text-gray-400 font-medium">Month</th>
                         <th className="text-right py-2 text-gray-400 font-medium">Income</th>
                         <th className="text-right py-2 text-gray-400 font-medium">Spent</th>
+                        <th className="text-right py-2 text-gray-400 font-medium">Subs</th>
                         <th className="text-right py-2 text-gray-400 font-medium">Net</th>
                         <th className="text-right py-2 text-gray-400 font-medium">Projected Net</th>
                         <th className="text-right py-2 text-gray-400 font-medium">Savings</th>
@@ -309,6 +317,7 @@ export default function BudgetPage() {
                           </td>
                           <td className="text-right text-green-400">${month.income?.toFixed(2)}</td>
                           <td className="text-right text-red-400">${month.spent?.toFixed(2)}</td>
+                          <td className="text-right text-gray-400">${(month.subscriptionCost || 0).toFixed(2)}</td>
                           <td className={`text-right font-semibold ${month.isPositive ? 'text-green-400' : 'text-red-400'}`}>
                             {month.isPositive ? '+' : ''}${month.netCashFlow?.toFixed(2)}
                             {month.isPositive ? ' ✅' : ' ⚠️'}
