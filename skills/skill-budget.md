@@ -107,9 +107,41 @@ Authorization: Bearer <token>
 
 ```
 GET /api/budget/summary?month=2026-03        # Budget overview with category breakdown
-GET /api/budget/trends?months=6              # Monthly spending over time
-GET /api/budget/upcoming-bills               # Upcoming bills
+GET /api/budget/trends?months=6              # Monthly spending over time (incl. subscriptionCost)
+GET /api/budget/upcoming-bills               # Upcoming bills (auto-derived from recurring)
 ```
+
+---
+
+## Subscriptions (Rocket Money–style recurring detection)
+
+Detected by the budget agent's `detect-recurring.py` and posted per month. The dashboard
+filters `isSubscription` for the Subscriptions panel.
+
+```
+GET /api/budget/subscriptions?month=2026-06   # { month, summary, subscriptions[] }
+PUT /api/budget/subscriptions                 # bulk-replace a month's detected set (auth)
+  { "month": "2026-06", "subscriptions": [ { ...fields below } ] }
+```
+
+Subscription fields: `merchantKey, merchant, category, isSubscription, cadence` (weekly|
+biweekly|monthly|quarterly|semiannual|annual)`, amount, monthlyEquivalent, annualizedCost,
+predictedNextCharge, lastCharge, occurrences, serviceGroup, status` (active|lapsed|keep|
+cancel|ignore)`, flags { priceIncrease, new, trialLikely, lapsed, duplicateService }`.
+
+`duplicateService` = two or more **active** services in the same `serviceGroup` (e.g. two
+streaming services) — an overlap/savings nudge, NOT a double charge.
+
+Summary: `{ count, activeCount, lapsedCount, totalMonthly, totalAnnual, flagged, upcoming[] }`.
+
+## Bills (auto-derived)
+
+```
+PUT /api/budget/bills                         # bulk-replace upcoming bills (auth)
+  { "bills": [ { "name", "amount", "dueDate", "category", "recurring", "priority" } ] }
+```
+Posted by `sync-clawmander-subscriptions.py` from predicted next charges of active recurring
+items (subscriptions + Housing/Utilities/Insurance) within the next ~45 days.
 
 Summary response:
 ```json
