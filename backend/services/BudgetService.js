@@ -33,8 +33,43 @@ class BudgetService {
     this.balancesStore = new FileStore('budget-balances.json');
     this.subscriptionsStore = new FileStore('budget-subscriptions.json');
     this.billsStore = new FileStore('bills.json');
+    this.networthStore = new FileStore('budget-networth.json');
     this.sse = sseManager;
     this.incomeFilePath = dataPath('monthly-income.json');
+  }
+
+  // ── Net worth (liquid cash position) trend ────────────────────────────────
+  getNetworth(limit = 12) {
+    const rows = this.networthStore.read()
+      .slice()
+      .sort((a, b) => String(a.month).localeCompare(String(b.month)));
+    return typeof limit === 'number' && limit > 0 ? rows.slice(-limit) : rows;
+  }
+
+  // Upsert one month's net-worth snapshot (latest snapshot for the month wins).
+  recordNetworth(snapshot = {}) {
+    const month = snapshot.month || new Date().toISOString().slice(0, 7);
+    const round2 = (n) => (typeof n === 'number' ? Math.round(n * 100) / 100 : n);
+    const rows = this.networthStore.read();
+    const payload = {
+      month,
+      date: snapshot.date || new Date().toISOString().slice(0, 10),
+      checking: round2(Number(snapshot.checking) || 0),
+      savings: round2(Number(snapshot.savings) || 0),
+      cardDebt: round2(Number(snapshot.cardDebt) || 0),
+      netWorth: round2(
+        snapshot.netWorth != null
+          ? Number(snapshot.netWorth)
+          : (Number(snapshot.checking) || 0) + (Number(snapshot.savings) || 0) - (Number(snapshot.cardDebt) || 0),
+      ),
+      reconstructed: !!snapshot.reconstructed,
+      updatedAt: new Date().toISOString(),
+    };
+    const idx = rows.findIndex((r) => r.month === month);
+    if (idx >= 0) rows[idx] = payload; else rows.push(payload);
+    this.networthStore.write(rows);
+    this.sse.broadcast('budget.networth_updated', { month, netWorth: payload.netWorth });
+    return payload;
   }
 
   // ── Subscriptions ─────────────────────────────────────────────────────────

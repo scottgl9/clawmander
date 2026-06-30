@@ -8,6 +8,8 @@ import ProgressBar from '../components/shared/ProgressBar';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import BudgetDetailModal from '../components/budget/BudgetDetailModal';
 import Subscriptions from '../components/budget/Subscriptions';
+import CashFlow from '../components/budget/CashFlow';
+import NetWorth from '../components/budget/NetWorth';
 
 function badgeClass(kind = 'variable') {
   if (kind === 'fixed') return 'bg-emerald-500/20 text-emerald-300';
@@ -92,6 +94,10 @@ export default function BudgetPage() {
   );
   const { data: subscriptions } = useAPI(
     () => api.budget.getSubscriptions({ month: selectedMonth }),
+    [selectedMonth],
+  );
+  const { data: networth } = useAPI(
+    () => api.budget.getNetworth({ limit: 12 }),
     [selectedMonth],
   );
 
@@ -188,6 +194,8 @@ export default function BudgetPage() {
                 </div>
               </div>
             )}
+
+            {isCurrentMonth && <CashFlow cashflow={status?.cashflow} />}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-surface rounded-lg p-4 sm:p-6 border border-gray-800">
@@ -286,6 +294,8 @@ export default function BudgetPage() {
             </div>
 
             <Subscriptions data={subscriptions} />
+
+            <NetWorth data={networth} />
 
             {trends && trends.length > 0 && (
               <div className="bg-surface rounded-lg p-4 sm:p-6 border border-gray-800">
