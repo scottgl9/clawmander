@@ -143,6 +143,25 @@ PUT /api/budget/bills                         # bulk-replace upcoming bills (aut
 Posted by `sync-clawmander-subscriptions.py` from predicted next charges of active recurring
 items (subscriptions + Housing/Utilities/Insurance) within the next ~45 days.
 
+## Cash flow & safe-to-spend
+
+`cashflow-forecast.py` PATCHes a `cashflow` block onto `GET /api/budget/status`:
+`{ safeToSpendPerDay, safeToSpendTotal, budgetRemainingPerDay, projectedEomBalance,
+minBalance, minBalanceDate, lowBalanceRisk, dailyBurn, remainingIncome, committedBills,
+daysRemaining, dailyProjection[] }`. The dashboard renders this as the Cash Flow card on the
+current month.
+
+## Net worth (liquid cash position)
+
+```
+GET /api/budget/networth?limit=12     # monthly series, oldest→newest
+PUT /api/budget/networth              # upsert one month's snapshot (auth)
+  { "month", "date", "checking", "savings", "cardDebt", "netWorth", "reconstructed" }
+```
+Liquid only (linked WF accounts: checking + savings − card). Prior months can be
+reconstructed from the current balance and each month's net cash flow
+(`cashflow-forecast.py --backfill-networth N`).
+
 Summary response:
 ```json
 {

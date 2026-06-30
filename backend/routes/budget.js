@@ -58,6 +58,12 @@ module.exports = function (budgetService) {
     });
   });
 
+  // Net worth (liquid cash position) trend
+  router.get('/networth', (req, res) => {
+    const limit = parseInt(req.query.limit || '12', 10);
+    res.json(budgetService.getNetworth(limit));
+  });
+
   // Upcoming bills
   router.get('/upcoming-bills', (req, res) => {
     const FileStore = require('../storage/FileStore');
@@ -137,6 +143,12 @@ module.exports = function (budgetService) {
     const items = (req.body && req.body.bills) || [];
     const rows = budgetService.replaceBills(items);
     res.json({ count: rows.length });
+  });
+
+  // Record a net-worth snapshot for a month (agent sync)
+  router.put('/networth', requireAuth, (req, res) => {
+    const saved = budgetService.recordNetworth(req.body || {});
+    res.json(saved);
   });
 
   return router;
