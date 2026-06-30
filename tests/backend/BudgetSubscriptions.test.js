@@ -66,6 +66,19 @@ describe('BudgetService subscriptions & bills', () => {
     expect(jun.subscriptionCost).toBe(27.05);
   });
 
+  test('sinking funds: only irregular cadences, with monthly set-aside', () => {
+    service.replaceSubscriptions('2026-06', [
+      sub({ merchantKey: 'netflix', merchant: 'Netflix', cadence: 'monthly', annualizedCost: 324.6 }),
+      sub({ merchantKey: 'pest', merchant: 'Hometeam Pest', cadence: 'quarterly', amount: 139.81, annualizedCost: 559.24 }),
+      sub({ merchantKey: 'ins', merchant: 'Auto Insurance', cadence: 'annual', amount: 600, annualizedCost: 600 }),
+    ]);
+    const sf = service.getSinkingFunds('2026-06');
+    // Monthly Netflix excluded; quarterly + annual included.
+    expect(sf.items.map((i) => i.merchant).sort()).toEqual(['Auto Insurance', 'Hometeam Pest']);
+    // 559.24/12 + 600/12 = 46.60 + 50.00
+    expect(sf.totalMonthly).toBeCloseTo(96.6, 1);
+  });
+
   test('replaceBills writes normalized bill rows', () => {
     const rows = service.replaceBills([
       { name: 'Netflix', amount: 27.05, dueDate: '2026-07-13', category: 'Subscriptions' },

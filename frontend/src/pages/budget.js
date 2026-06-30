@@ -8,6 +8,7 @@ import ProgressBar from '../components/shared/ProgressBar';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import BudgetDetailModal from '../components/budget/BudgetDetailModal';
 import Subscriptions from '../components/budget/Subscriptions';
+import SinkingFunds from '../components/budget/SinkingFunds';
 import CashFlow from '../components/budget/CashFlow';
 import NetWorth from '../components/budget/NetWorth';
 
@@ -185,12 +186,20 @@ export default function BudgetPage() {
             {summary.alerts?.length > 0 && (
               <div className="bg-surface rounded-lg p-4 sm:p-6 border border-gray-800">
                 <h3 className="text-sm font-semibold text-white mb-4">Budget Alerts</h3>
-                <div className="space-y-2 text-sm text-amber-300">
-                  {summary.alerts.map((alert, idx) => (
-                    <div key={`${alert.category || idx}-${alert.message}`}>
-                      {alert.message}
-                    </div>
-                  ))}
+                <div className="space-y-2 text-sm">
+                  {summary.alerts.map((alert, idx) => {
+                    const level = alert.level || 'warning';
+                    const cls = level === 'critical' ? 'text-red-300 border-red-500/40 bg-red-500/10'
+                      : level === 'info' ? 'text-gray-300 border-gray-700 bg-gray-500/5'
+                      : 'text-amber-300 border-amber-500/30 bg-amber-500/10';
+                    const icon = level === 'critical' ? '🔴' : level === 'info' ? 'ℹ️' : '⚠️';
+                    return (
+                      <div key={`${alert.type || alert.category || idx}-${alert.message}`}
+                        className={`rounded-md border px-3 py-2 ${cls}`}>
+                        <span className="mr-1">{icon}</span>{alert.message}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -294,6 +303,8 @@ export default function BudgetPage() {
             </div>
 
             <Subscriptions data={subscriptions} />
+
+            <SinkingFunds data={subscriptions} />
 
             <NetWorth data={networth} />
 

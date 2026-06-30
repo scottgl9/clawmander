@@ -54,6 +54,7 @@ module.exports = function (budgetService) {
     res.json({
       month: month || new Date().toISOString().slice(0, 7),
       summary: budgetService.getSubscriptionSummary(month),
+      sinkingFunds: budgetService.getSinkingFunds(month),
       subscriptions: budgetService.getSubscriptions(month),
     });
   });

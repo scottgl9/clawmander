@@ -123,6 +123,44 @@ class BudgetService {
     return created;
   }
 
+  // Sinking funds: for irregular (non-monthly) recurring charges, the amount to set
+  // aside each month so the lumpy quarterly/annual bill is covered when it lands.
+  getSinkingFunds(month) {
+    const IRREGULAR = new Set(['quarterly', 'semiannual', 'annual']);
+    // Only genuine committed recurring bills — exclude discretionary categories that
+    // may recur on a coincidental cadence (groceries/shopping/dining trips, etc.).
+    const COMMITTED = new Set(['Housing', 'Insurance', 'Utilities']);
+    const round2 = (n) => Math.round(n * 100) / 100;
+    const today = new Date();
+    const items = this.getSubscriptions(month)
+      .filter((s) => IRREGULAR.has(s.cadence)
+        && (s.isSubscription || COMMITTED.has(s.category))
+        && !(s.flags && s.flags.lapsed) && s.status !== 'cancel' && s.status !== 'ignore')
+      .map((s) => {
+        const monthlySetAside = round2((s.annualizedCost || 0) / 12);
+        // Fraction of the billing cycle already elapsed → how much should already be reserved.
+        let reserveNeededNow = null;
+        const next = s.predictedNextCharge ? new Date(s.predictedNextCharge) : null;
+        const interval = s.intervalDays || (s.cadence === 'quarterly' ? 91 : s.cadence === 'semiannual' ? 182 : 365);
+        if (next && !Number.isNaN(next.getTime())) {
+          const daysUntil = Math.max(0, Math.round((next - today) / (24 * 3600 * 1000)));
+          const elapsedFrac = Math.min(1, Math.max(0, (interval - daysUntil) / interval));
+          reserveNeededNow = round2((s.amount || 0) * elapsedFrac);
+        }
+        return {
+          merchant: s.merchant, category: s.category, cadence: s.cadence,
+          amount: round2(s.amount || 0), monthlySetAside,
+          nextCharge: s.predictedNextCharge, reserveNeededNow,
+        };
+      })
+      .sort((a, b) => b.monthlySetAside - a.monthlySetAside);
+    return {
+      items,
+      totalMonthly: round2(items.reduce((sum, i) => sum + i.monthlySetAside, 0)),
+      reserveNeededNow: round2(items.reduce((sum, i) => sum + (i.reserveNeededNow || 0), 0)),
+    };
+  }
+
   // Monthly active-subscription cost for the trends view (STRICT month match —
   // no fall-back, so months without a snapshot read as 0 rather than borrowing
   // another month's figure).
