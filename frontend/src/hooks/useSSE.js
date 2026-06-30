@@ -37,7 +37,7 @@ export function useSSE(onEvent) {
       'agent.status_changed', 'heartbeat.received', 'system.health',
       'server.status',
       'chat.delta', 'chat.final', 'chat.error', 'chat.aborted',
-      'chat.approval', 'chat.subagent',
+      'chat.approval', 'chat.approval.resolved', 'chat.subagent',
       'agent.status', 'agent.status.snapshot',
       'feed.new', 'cron.status',
       'actionitem.created', 'actionitem.updated', 'actionitem.deleted',

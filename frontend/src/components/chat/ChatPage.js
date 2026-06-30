@@ -7,7 +7,6 @@ import { chatApi } from '../../lib/chatApi';
 import SessionSidebar from './SessionSidebar';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
-import ApprovalBanner from './ApprovalBanner';
 import SubagentBadge from './SubagentBadge';
 import AgentPresenceBar from './AgentPresenceBar';
 
@@ -49,10 +48,10 @@ export default function ChatPage({ onConnectionChange }) {
 
   const {
     sessions, models, activeSession, messages,
-    approvalPending, setApprovalPending, subagentActivity,
+    subagentActivity,
     connected, sending, loadingHistory, error, setError,
     loadSessions, switchSession, switchModel, createSession,
-    sendMessage, handleSSEEvent,
+    sendMessage, resolveApproval, handleSSEEvent,
   } = useChatState();
 
   const filteredSessions = useMemo(() => filterSessions(sessions, filter), [sessions, filter]);
@@ -247,9 +246,14 @@ export default function ChatPage({ onConnectionChange }) {
           </div>
         ) : (
           <>
-            <MessageList messages={currentMessages} loading={loadingHistory} onSpeak={handleSpeak} onRetry={handleRetry} />
+            <MessageList
+              messages={currentMessages}
+              loading={loadingHistory}
+              onSpeak={handleSpeak}
+              onRetry={handleRetry}
+              onResolveApproval={resolveApproval}
+            />
             <SubagentBadge activity={subagentActivity} />
-            <ApprovalBanner approval={approvalPending} onResolved={() => setApprovalPending(null)} />
             {error && (
               <div className="mx-4 mb-2 px-3 py-2 bg-red-900/30 border border-red-700/50 rounded text-sm text-red-300 flex items-center justify-between">
                 <span>{error}</span>
