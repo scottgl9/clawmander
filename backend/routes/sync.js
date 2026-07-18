@@ -11,7 +11,7 @@ module.exports = function (messageModel, genericSyncModel) {
       for (const item of items) {
         const normalized = {
           id: String(item.id),
-          type: 'sms',
+          type: String(item.id).startsWith('mms_') ? 'mms' : 'sms',
           sender: item.type === 1 ? item.address : 'me',
           recipient: item.type === 2 ? item.address : 'me',
           body: item.body,
