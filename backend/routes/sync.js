@@ -7,32 +7,44 @@ module.exports = function (messageModel, genericSyncModel) {
   router.post('/sms', anyAuth, (req, res) => {
     const items = req.body;
     let count = 0;
-    if (Array.isArray(items)) {
-      for (const item of items) {
-        const normalized = {
-          id: String(item.id),
-          type: String(item.id).startsWith('mms_') ? 'mms' : 'sms',
-          sender: item.type === 1 ? item.address : 'me',
-          recipient: item.type === 2 ? item.address : 'me',
-          body: item.body,
-          received_at: new Date(item.date_ms).toISOString(),
-          raw_payload: JSON.stringify(item)
-        };
-        const result = messageModel.upsert(normalized);
-        if (result.inserted) count++;
-      }
+    
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ error: 'Payload must be an array', status: 'error' });
     }
-    res.json({ count, status: 'ok' });
+    
+    for (const item of items) {
+      if (!item.id) {
+        return res.status(400).json({ error: 'Missing id field in item', status: 'error' });
+      }
+      const normalized = {
+        id: String(item.id),
+        type: String(item.id).startsWith('mms_') ? 'mms' : 'sms',
+        sender: item.type === 1 ? item.address : 'me',
+        recipient: item.type === 2 ? item.address : 'me',
+        body: item.body,
+        received_at: new Date(item.date_ms).toISOString(),
+        raw_payload: JSON.stringify(item)
+      };
+      const result = messageModel.upsert(normalized);
+      if (result.inserted) count++;
+    }
+    
+    res.json({ count, status: 'ok', accepted: true });
   });
 
   const genericSync = (type) => {
     return (req, res) => {
       const items = req.body;
       let count = 0;
-      if (Array.isArray(items) && items.length > 0) {
+      
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ error: 'Payload must be an array', status: 'error' });
+      }
+      
+      if (items.length > 0) {
         count = genericSyncModel.upsert(type, items);
       }
-      res.json({ count, status: 'ok' });
+      res.json({ count, status: 'ok', accepted: true });
     };
   };
 
