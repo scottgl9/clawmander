@@ -22,6 +22,7 @@ const OpenClawCLI = require('./services/OpenClawCLI');
 const Message = require('./models/Message');
 const SmsGatewayService = require('./services/SmsGatewayService');
 const AuthDB = require('./storage/AuthDB');
+const GenericSync = require('./models/GenericSync');
 const { attachTerminalWS } = require('./routes/terminal');
 const { attachBrowserWS } = require('./routes/browser');
 const mountRoutes = require('./routes');
@@ -65,6 +66,7 @@ const terminalService = new TerminalService();
 const browserManager = new BrowserManager(sseManager, config);
 const openClawCLI = new OpenClawCLI(config.openClawHome);
 const messageModel = new Message();
+const genericSyncModel = new GenericSync();
 const smsGatewayService = new SmsGatewayService(messageModel);
 
 // Wire chat events into ChatService for message history tracking
@@ -79,7 +81,7 @@ sseManager.broadcast = function (event, data) {
 };
 
 // Routes
-mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, cronService, memoryService, drawingService, config, authDB, browserManager, openClawCLI, smsGatewayService, messageModel });
+mountRoutes(app, { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, cronService, memoryService, drawingService, config, authDB, browserManager, openClawCLI, smsGatewayService, messageModel, genericSyncModel });
 
 // Health check
 app.get('/api/health', (req, res) => {
