@@ -145,6 +145,7 @@ backend/storage/data/
 *.db
 *.db-wal
 *.db-shm
+.codegraph/
 
 # Next.js generated service worker / workbox files
 frontend/public/sw.js
