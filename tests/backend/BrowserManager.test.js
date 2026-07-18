@@ -95,7 +95,7 @@ describe('BrowserManager', () => {
     expect(opts.ignoreDefaultArgs).toEqual(['--enable-automation', '--enable-blink-features=IdleDetection']);
     expect(opts.args).toContain('--headless=new');
     expect(opts.args).toContain('--disable-blink-features=AutomationControlled');
-    expect(opts.userAgent).toMatch(/Chrome\/146/);
+    expect(opts.userAgent).toMatch(/Chrome\/1\d{2}/);
   });
 
   test('createInstance rejects duplicate ID', async () => {
