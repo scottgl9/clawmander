@@ -1,6 +1,7 @@
 const FileStore = require('../storage/FileStore');
 const { createBudgetCategory } = require('../models/BudgetCategory');
 const { createTransaction } = require('../models/Transaction');
+const { createSubscription } = require('../models/Subscription');
 const fs = require('fs');
 const { dataPath } = require('../storage/dataDir');
 
@@ -30,8 +31,164 @@ class BudgetService {
     this.transactionsStore = new FileStore('budget-transactions.json');
     this.statusStore = new FileStore('budget-status.json');
     this.balancesStore = new FileStore('budget-balances.json');
+    this.subscriptionsStore = new FileStore('budget-subscriptions.json');
+    this.billsStore = new FileStore('bills.json');
+    this.networthStore = new FileStore('budget-networth.json');
     this.sse = sseManager;
     this.incomeFilePath = dataPath('monthly-income.json');
+  }
+
+  // ── Net worth (liquid cash position) trend ────────────────────────────────
+  getNetworth(limit = 12) {
+    const rows = this.networthStore.read()
+      .slice()
+      .sort((a, b) => String(a.month).localeCompare(String(b.month)));
+    return typeof limit === 'number' && limit > 0 ? rows.slice(-limit) : rows;
+  }
+
+  // Upsert one month's net-worth snapshot (latest snapshot for the month wins).
+  recordNetworth(snapshot = {}) {
+    const month = snapshot.month || new Date().toISOString().slice(0, 7);
+    const round2 = (n) => (typeof n === 'number' ? Math.round(n * 100) / 100 : n);
+    const rows = this.networthStore.read();
+    const payload = {
+      month,
+      date: snapshot.date || new Date().toISOString().slice(0, 10),
+      checking: round2(Number(snapshot.checking) || 0),
+      savings: round2(Number(snapshot.savings) || 0),
+      cardDebt: round2(Number(snapshot.cardDebt) || 0),
+      netWorth: round2(
+        snapshot.netWorth != null
+          ? Number(snapshot.netWorth)
+          : (Number(snapshot.checking) || 0) + (Number(snapshot.savings) || 0) - (Number(snapshot.cardDebt) || 0),
+      ),
+      reconstructed: !!snapshot.reconstructed,
+      updatedAt: new Date().toISOString(),
+    };
+    const idx = rows.findIndex((r) => r.month === month);
+    if (idx >= 0) rows[idx] = payload; else rows.push(payload);
+    this.networthStore.write(rows);
+    this.sse.broadcast('budget.networth_updated', { month, netWorth: payload.netWorth });
+    return payload;
+  }
+
+  // ── Subscriptions ─────────────────────────────────────────────────────────
+  getSubscriptions(month) {
+    const all = this.subscriptionsStore.read();
+    const currentMonth = month || new Date().toISOString().slice(0, 7);
+    const forMonth = all.filter((s) => s.month === currentMonth);
+    // Fall back to the latest available month if the requested one is empty.
+    if (forMonth.length === 0 && all.length > 0) {
+      const latest = all.reduce((max, s) => (s.month > max ? s.month : max), '');
+      return all.filter((s) => s.month === latest);
+    }
+    return forMonth;
+  }
+
+  getSubscriptionSummary(month) {
+    const subs = this.getSubscriptions(month).filter((s) => s.isSubscription);
+    const active = subs.filter((s) => !(s.flags && s.flags.lapsed) && s.status !== 'cancel' && s.status !== 'ignore');
+    const round2 = (n) => Math.round(n * 100) / 100;
+    const now = new Date();
+    const in30 = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const upcoming = active
+      .filter((s) => {
+        if (!s.predictedNextCharge) return false;
+        const d = new Date(s.predictedNextCharge);
+        return d >= now && d <= in30;
+      })
+      .sort((a, b) => new Date(a.predictedNextCharge) - new Date(b.predictedNextCharge));
+    return {
+      count: subs.length,
+      activeCount: active.length,
+      lapsedCount: subs.filter((s) => s.flags && s.flags.lapsed).length,
+      totalMonthly: round2(active.reduce((sum, s) => sum + (s.monthlyEquivalent || 0), 0)),
+      totalAnnual: round2(active.reduce((sum, s) => sum + (s.annualizedCost || 0), 0)),
+      flagged: active.filter((s) => s.flags && (s.flags.priceIncrease || s.flags.new || s.flags.duplicateService)).length,
+      upcoming: upcoming.map((s) => ({
+        merchant: s.merchant,
+        amount: s.monthlyEquivalent,
+        date: s.predictedNextCharge,
+      })),
+    };
+  }
+
+  // Bulk-replace the detected subscriptions for a month (posted by the agent).
+  replaceSubscriptions(month, items = []) {
+    const currentMonth = month || new Date().toISOString().slice(0, 7);
+    const all = this.subscriptionsStore.read().filter((s) => s.month !== currentMonth);
+    const created = (items || []).map((item) => createSubscription({ ...item, month: currentMonth }));
+    this.subscriptionsStore.write([...all, ...created]);
+    this.sse.broadcast('budget.subscriptions_updated', { month: currentMonth, count: created.length });
+    return created;
+  }
+
+  // Sinking funds: for irregular (non-monthly) recurring charges, the amount to set
+  // aside each month so the lumpy quarterly/annual bill is covered when it lands.
+  getSinkingFunds(month) {
+    const IRREGULAR = new Set(['quarterly', 'semiannual', 'annual']);
+    // Only genuine committed recurring bills — exclude discretionary categories that
+    // may recur on a coincidental cadence (groceries/shopping/dining trips, etc.).
+    const COMMITTED = new Set(['Housing', 'Insurance', 'Utilities']);
+    const round2 = (n) => Math.round(n * 100) / 100;
+    const today = new Date();
+    const items = this.getSubscriptions(month)
+      .filter((s) => IRREGULAR.has(s.cadence)
+        && (s.isSubscription || COMMITTED.has(s.category))
+        && !(s.flags && s.flags.lapsed) && s.status !== 'cancel' && s.status !== 'ignore')
+      .map((s) => {
+        const monthlySetAside = round2((s.annualizedCost || 0) / 12);
+        // Fraction of the billing cycle already elapsed → how much should already be reserved.
+        let reserveNeededNow = null;
+        const next = s.predictedNextCharge ? new Date(s.predictedNextCharge) : null;
+        const interval = s.intervalDays || (s.cadence === 'quarterly' ? 91 : s.cadence === 'semiannual' ? 182 : 365);
+        if (next && !Number.isNaN(next.getTime())) {
+          const daysUntil = Math.max(0, Math.round((next - today) / (24 * 3600 * 1000)));
+          const elapsedFrac = Math.min(1, Math.max(0, (interval - daysUntil) / interval));
+          reserveNeededNow = round2((s.amount || 0) * elapsedFrac);
+        }
+        return {
+          merchant: s.merchant, category: s.category, cadence: s.cadence,
+          amount: round2(s.amount || 0), monthlySetAside,
+          nextCharge: s.predictedNextCharge, reserveNeededNow,
+        };
+      })
+      .sort((a, b) => b.monthlySetAside - a.monthlySetAside);
+    return {
+      items,
+      totalMonthly: round2(items.reduce((sum, i) => sum + i.monthlySetAside, 0)),
+      reserveNeededNow: round2(items.reduce((sum, i) => sum + (i.reserveNeededNow || 0), 0)),
+    };
+  }
+
+  // Monthly active-subscription cost for the trends view (STRICT month match —
+  // no fall-back, so months without a snapshot read as 0 rather than borrowing
+  // another month's figure).
+  getSubscriptionMonthlyCost(month) {
+    if (!month) return 0;
+    const subs = this.subscriptionsStore.read().filter(
+      (s) => s.month === month && s.isSubscription
+        && !(s.flags && s.flags.lapsed) && s.status !== 'cancel' && s.status !== 'ignore',
+    );
+    return Math.round(subs.reduce((sum, s) => sum + (s.monthlyEquivalent || 0), 0) * 100) / 100;
+  }
+
+  // ── Bills (auto-derived; replaces hand-maintained bills.json) ──────────────
+  replaceBills(items = []) {
+    const rows = (items || []).map((b) => ({
+      id: b.id || (b.name ? `${b.name}-${b.dueDate}` : undefined),
+      name: b.name || '',
+      amount: typeof b.amount === 'number' ? b.amount : Number(b.amount) || 0,
+      dueDate: b.dueDate || null,
+      recurring: b.recurring !== false,
+      category: b.category || 'Other',
+      priority: b.priority || 'normal',
+      description: b.description || '',
+      source: b.source || 'budget-agent',
+    }));
+    this.billsStore.write(rows);
+    this.sse.broadcast('budget.bills_updated', { count: rows.length });
+    return rows;
   }
 
   // Get monthly income from cache file
@@ -370,6 +527,7 @@ class BudgetService {
         savingsRate: monthlyIncome > 0 ? round2((netCashFlow / monthlyIncome) * 100) : 0,
         isProjected,
         projectedNetEom: projectedNetEOM,
+        subscriptionCost: this.getSubscriptionMonthlyCost(monthKey),
         sourceStatus: status ? status.sourceStatus || {} : {},
       });
     }

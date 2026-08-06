@@ -7,6 +7,10 @@ import { api } from '../lib/api';
 import ProgressBar from '../components/shared/ProgressBar';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import BudgetDetailModal from '../components/budget/BudgetDetailModal';
+import Subscriptions from '../components/budget/Subscriptions';
+import SinkingFunds from '../components/budget/SinkingFunds';
+import CashFlow from '../components/budget/CashFlow';
+import NetWorth from '../components/budget/NetWorth';
 
 function badgeClass(kind = 'variable') {
   if (kind === 'fixed') return 'bg-emerald-500/20 text-emerald-300';
@@ -87,6 +91,14 @@ export default function BudgetPage() {
   );
   const { data: balances } = useAPI(
     () => api.budget.getBalances({ month: selectedMonth }),
+    [selectedMonth],
+  );
+  const { data: subscriptions } = useAPI(
+    () => api.budget.getSubscriptions({ month: selectedMonth }),
+    [selectedMonth],
+  );
+  const { data: networth } = useAPI(
+    () => api.budget.getNetworth({ limit: 12 }),
     [selectedMonth],
   );
 
@@ -174,15 +186,25 @@ export default function BudgetPage() {
             {summary.alerts?.length > 0 && (
               <div className="bg-surface rounded-lg p-4 sm:p-6 border border-gray-800">
                 <h3 className="text-sm font-semibold text-white mb-4">Budget Alerts</h3>
-                <div className="space-y-2 text-sm text-amber-300">
-                  {summary.alerts.map((alert, idx) => (
-                    <div key={`${alert.category || idx}-${alert.message}`}>
-                      {alert.message}
-                    </div>
-                  ))}
+                <div className="space-y-2 text-sm">
+                  {summary.alerts.map((alert, idx) => {
+                    const level = alert.level || 'warning';
+                    const cls = level === 'critical' ? 'text-red-300 border-red-500/40 bg-red-500/10'
+                      : level === 'info' ? 'text-gray-300 border-gray-700 bg-gray-500/5'
+                      : 'text-amber-300 border-amber-500/30 bg-amber-500/10';
+                    const icon = level === 'critical' ? '🔴' : level === 'info' ? 'ℹ️' : '⚠️';
+                    return (
+                      <div key={`${alert.type || alert.category || idx}-${alert.message}`}
+                        className={`rounded-md border px-3 py-2 ${cls}`}>
+                        <span className="mr-1">{icon}</span>{alert.message}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
+
+            {isCurrentMonth && <CashFlow cashflow={status?.cashflow} />}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-surface rounded-lg p-4 sm:p-6 border border-gray-800">
@@ -280,6 +302,12 @@ export default function BudgetPage() {
               </div>
             </div>
 
+            <Subscriptions data={subscriptions} />
+
+            <SinkingFunds data={subscriptions} />
+
+            <NetWorth data={networth} />
+
             {trends && trends.length > 0 && (
               <div className="bg-surface rounded-lg p-4 sm:p-6 border border-gray-800">
                 <h3 className="text-sm font-semibold text-white mb-4">6-Month Cash Flow</h3>
@@ -291,6 +319,7 @@ export default function BudgetPage() {
                         <th className="text-left py-2 text-gray-400 font-medium">Month</th>
                         <th className="text-right py-2 text-gray-400 font-medium">Income</th>
                         <th className="text-right py-2 text-gray-400 font-medium">Spent</th>
+                        <th className="text-right py-2 text-gray-400 font-medium">Subs</th>
                         <th className="text-right py-2 text-gray-400 font-medium">Net</th>
                         <th className="text-right py-2 text-gray-400 font-medium">Projected Net</th>
                         <th className="text-right py-2 text-gray-400 font-medium">Savings</th>
@@ -309,6 +338,7 @@ export default function BudgetPage() {
                           </td>
                           <td className="text-right text-green-400">${month.income?.toFixed(2)}</td>
                           <td className="text-right text-red-400">${month.spent?.toFixed(2)}</td>
+                          <td className="text-right text-gray-400">${(month.subscriptionCost || 0).toFixed(2)}</td>
                           <td className={`text-right font-semibold ${month.isPositive ? 'text-green-400' : 'text-red-400'}`}>
                             {month.isPositive ? '+' : ''}${month.netCashFlow?.toFixed(2)}
                             {month.isPositive ? ' ✅' : ' ⚠️'}

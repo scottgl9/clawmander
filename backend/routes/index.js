@@ -18,9 +18,10 @@ const { browserRoutes } = require('./browser');
 const gatewayRoutes = require('./gateway');
 const approvalsRoutes = require('./approvals');
 const smsRoutes = require('./sms');
+const syncRoutes = require('./sync');
 
 module.exports = function mountRoutes(app, services) {
-  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, cronService, memoryService, drawingService, config, authDB, browserManager, openClawCLI, smsGatewayService, messageModel } = services;
+  const { taskService, agentService, heartbeatService, budgetService, actionItemService, sseManager, serverStatusService, chatGatewayClient, chatService, cronService, memoryService, drawingService, config, authDB, browserManager, openClawCLI, smsGatewayService, messageModel, genericSyncModel } = services;
 
   // Auth routes (no auth required — handles its own)
   app.use('/api/auth', authRoutes(authDB, config));
@@ -55,4 +56,5 @@ module.exports = function mountRoutes(app, services) {
   app.use('/api/gateway', gatewayRoutes());
   app.use('/api/approvals', approvalsRoutes(openClawCLI));
   app.use('/api/sms', smsRoutes(smsGatewayService, messageModel));
+  app.use('/api/sync', syncRoutes(messageModel, genericSyncModel));
 };
