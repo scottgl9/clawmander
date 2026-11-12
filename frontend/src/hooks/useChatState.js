@@ -19,6 +19,7 @@ export function useChatState() {
   const [streamingRunIdMap, setStreamingRunIdMap] = useState({});
   const [sendingMap, setSendingMap] = useState({});
   const [approvalPending, setApprovalPending] = useState(null);
+  const [approvals, setApprovals] = useState({});
   const [subagentActivity, setSubagentActivity] = useState([]);
   const [connected, setConnected] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -319,9 +320,65 @@ export function useChatState() {
         setMessageQueue(prev => ({ ...prev, [sessionKey]: [] }));
         break;
       }
-      case 'chat.approval':
-        setApprovalPending(event.data);
+      case 'chat.approval': {
+        const approval = event.data || {};
+        if (!approval.approvalId) break;
+        const sessionKey = approval.sessionKey || activeSessionRef.current;
+        if (!sessionKey) {
+          setApprovalPending(approval);
+          break;
+        }
+        const normalized = { ...approval, sessionKey, state: approval.state || 'pending' };
+        setApprovalPending(normalized);
+        setApprovals((prev) => ({ ...prev, [approval.approvalId]: normalized }));
+        setMessages((prev) => {
+          const sessionMsgs = prev[sessionKey] || [];
+          const existingIdx = sessionMsgs.findIndex((m) => m.approval?.approvalId === approval.approvalId);
+          const approvalMsg = {
+            id: `approval-${approval.approvalId}`,
+            sessionKey,
+            role: 'system',
+            content: 'Exec approval required',
+            state: 'complete',
+            attachments: [],
+            timestamp: new Date().toISOString(),
+            approval: normalized,
+          };
+          if (existingIdx !== -1) {
+            const updated = [...sessionMsgs];
+            updated[existingIdx] = { ...updated[existingIdx], approval: normalized };
+            return { ...prev, [sessionKey]: updated };
+          }
+          return { ...prev, [sessionKey]: [...sessionMsgs, approvalMsg] };
+        });
         break;
+      }
+      case 'chat.approval.resolved': {
+        const resolved = event.data || {};
+        if (!resolved.approvalId) break;
+        setApprovalPending((prev) => (prev?.approvalId === resolved.approvalId ? null : prev));
+        setApprovals((prev) => {
+          const existing = prev[resolved.approvalId] || {};
+          return {
+            ...prev,
+            [resolved.approvalId]: { ...existing, ...resolved, state: 'resolved' },
+          };
+        });
+        setMessages((prev) => {
+          const next = {};
+          for (const [sessionKey, sessionMsgs] of Object.entries(prev)) {
+            next[sessionKey] = sessionMsgs.map((m) => {
+              if (m.approval?.approvalId !== resolved.approvalId) return m;
+              return {
+                ...m,
+                approval: { ...m.approval, ...resolved, state: 'resolved' },
+              };
+            });
+          }
+          return next;
+        });
+        break;
+      }
       case 'chat.subagent':
         setSubagentActivity((prev) => {
           const filtered = prev.filter((s) => s.childSessionKey !== event.data.childSessionKey);
@@ -492,7 +549,7 @@ export function useChatState() {
           break;
         case '/approve':
           if (approvalPending) {
-            await chatApi.resolveApproval(approvalPending.approvalId, 'approve');
+            await chatApi.resolveApproval(approvalPending.approvalId, 'allow-once');
             setApprovalPending(null);
           }
           break;
@@ -532,6 +589,58 @@ export function useChatState() {
       setError(err.message);
     }
   }, [activeSession, approvalPending, sessions, switchSession, models, injectSystemMessage]);
+
+  const resolveApproval = useCallback(async (approvalId, decision) => {
+    if (!approvalId || !['allow-once', 'deny'].includes(decision)) return;
+    setApprovals((prev) => ({
+      ...prev,
+      [approvalId]: { ...(prev[approvalId] || {}), approvalId, state: 'resolving', decision },
+    }));
+    setMessages((prev) => {
+      const next = {};
+      for (const [sessionKey, sessionMsgs] of Object.entries(prev)) {
+        next[sessionKey] = sessionMsgs.map((m) => {
+          if (m.approval?.approvalId !== approvalId) return m;
+          return { ...m, approval: { ...m.approval, state: 'resolving', decision } };
+        });
+      }
+      return next;
+    });
+    try {
+      await chatApi.resolveApproval(approvalId, decision);
+      setApprovalPending((prev) => (prev?.approvalId === approvalId ? null : prev));
+      setApprovals((prev) => ({
+        ...prev,
+        [approvalId]: { ...(prev[approvalId] || {}), approvalId, state: 'resolved', decision },
+      }));
+      setMessages((prev) => {
+        const next = {};
+        for (const [sessionKey, sessionMsgs] of Object.entries(prev)) {
+          next[sessionKey] = sessionMsgs.map((m) => {
+            if (m.approval?.approvalId !== approvalId) return m;
+            return { ...m, approval: { ...m.approval, state: 'resolved', decision } };
+          });
+        }
+        return next;
+      });
+    } catch (err) {
+      setError(err.message);
+      setApprovals((prev) => ({
+        ...prev,
+        [approvalId]: { ...(prev[approvalId] || {}), approvalId, state: 'pending', error: err.message },
+      }));
+      setMessages((prev) => {
+        const next = {};
+        for (const [sessionKey, sessionMsgs] of Object.entries(prev)) {
+          next[sessionKey] = sessionMsgs.map((m) => {
+            if (m.approval?.approvalId !== approvalId) return m;
+            return { ...m, approval: { ...m.approval, state: 'pending', error: err.message } };
+          });
+        }
+        return next;
+      });
+    }
+  }, []);
 
   // Switch model on the active session (called directly from model picker)
   const switchModel = useCallback(async (modelId) => {
@@ -592,6 +701,7 @@ export function useChatState() {
     streamingRunId,
     approvalPending,
     setApprovalPending,
+    approvals,
     subagentActivity,
     connected,
     sending,
@@ -604,6 +714,7 @@ export function useChatState() {
     switchModel,
     createSession,
     sendMessage,
+    resolveApproval,
     handleSSEEvent,
     handleSlashCommand,
   };

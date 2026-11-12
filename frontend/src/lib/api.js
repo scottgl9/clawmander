@@ -92,9 +92,35 @@ export const api = {
     }),
   },
   budget: {
-    getSummary: () => fetchJSON('/api/budget/summary'),
-    getTrends: () => fetchJSON('/api/budget/trends'),
+    getSummary: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return fetchJSON(`/api/budget/summary${qs ? `?${qs}` : ''}`);
+    },
+    getTrends: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return fetchJSON(`/api/budget/trends${qs ? `?${qs}` : ''}`);
+    },
+    getTransactions: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return fetchJSON(`/api/budget/transactions${qs ? `?${qs}` : ''}`);
+    },
+    getStatus: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return fetchJSON(`/api/budget/status${qs ? `?${qs}` : ''}`);
+    },
     getUpcomingBills: () => fetchJSON('/api/budget/upcoming-bills'),
+    getSubscriptions: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return fetchJSON(`/api/budget/subscriptions${qs ? `?${qs}` : ''}`);
+    },
+    getNetworth: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return fetchJSON(`/api/budget/networth${qs ? `?${qs}` : ''}`);
+    },
+    getBalances: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return fetchJSON(`/api/budget/balances${qs ? `?${qs}` : ''}`);
+    },
   },
   jobs: {
     getRecent: () => fetchJSON('/api/jobs/recent'),

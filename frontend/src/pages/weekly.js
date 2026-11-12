@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm';
 
 const AGENT_LABELS = {
   'work-agent': 'Work Agent',
+  'general-agent': 'General Agent',
   'personal-agent': 'Personal Agent',
   'sentinel-work': 'Sentinel (Work)',
   'budget': 'Budget',

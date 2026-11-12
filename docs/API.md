@@ -82,8 +82,9 @@ Content-Type: application/json
 POST /api/chat/approval/resolve
 Content-Type: application/json
 
-{ "approvalId": "<uuid>", "decision": "approve" }
+{ "approvalId": "<uuid>", "decision": "allow-once" }
 ```
+`decision` must be `allow-once` or `deny`. The chat UI maps the approval checkmark to `allow-once`; durable `allow-always` approvals are intentionally not exposed by this endpoint.
 
 #### Upload Image
 ```
@@ -111,7 +112,8 @@ Delivered via `GET /api/sse/subscribe`:
 | `chat.final` | `{ sessionKey, runId, text, usage }` | Response complete |
 | `chat.error` | `{ sessionKey, runId, error }` | Response error |
 | `chat.aborted` | `{ sessionKey, runId }` | Response aborted |
-| `chat.approval` | `{ approvalId, sessionKey, command, description }` | Approval request pending |
+| `chat.approval` | `{ approvalId, sessionKey, command, commandText, cwd, host, nodeId, agentId, warningText, allowedDecisions, createdAtMs, expiresAtMs, state }` | Exec approval request pending |
+| `chat.approval.resolved` | `{ approvalId, sessionKey, decision, resolvedBy, state }` | Exec approval request resolved |
 | `chat.subagent` | `{ sessionKey, childSessionKey, state, label }` | Subagent activity |
 
 ---
@@ -391,6 +393,8 @@ The SSE stream emits the following events:
 | `chat.final` | `{ sessionKey, runId, text }` | Final assistant response |
 | `chat.error` | `{ sessionKey, runId, error }` | Chat error |
 | `chat.aborted` | `{ sessionKey, runId }` | Run was aborted |
+| `chat.approval` | `{ approvalId, sessionKey, command, ... }` | Exec approval requested |
+| `chat.approval.resolved` | `{ approvalId, sessionKey, decision, resolvedBy, state }` | Exec approval resolved |
 | `agent.status` | `{ agentId, isWorking, runId, sessionKey }` | Agent work state change |
 | `feed.new` | Feed entry object | New feed/report available |
 | `cron.status` | Cron status object | Cron job status change |
@@ -1126,4 +1130,3 @@ POST /api/sms/sync
 Trigger manual pull from phone. Returns `{ new_messages, reachable }`.
 
 ---
-

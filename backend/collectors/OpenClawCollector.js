@@ -149,8 +149,8 @@ class OpenClawCollector {
     })();
 
     const params = {
-      minProtocol: 3,
-      maxProtocol: 3,
+      minProtocol: 4,
+      maxProtocol: 4,
       client: {
         id: clientId,
         version: '1.0.0',

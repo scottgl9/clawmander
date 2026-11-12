@@ -12,7 +12,8 @@ module.exports = function (budgetService) {
 
   router.get('/trends', (req, res) => {
     const months = parseInt(req.query.months || '6', 10);
-    res.json(budgetService.getTrends(months));
+    const endMonth = req.query.endMonth;
+    res.json(budgetService.getTrends(months, endMonth));
   });
 
   router.get('/categories', (req, res) => {
@@ -35,6 +36,33 @@ module.exports = function (budgetService) {
     const transaction = budgetService.getTransactionById(req.params.id);
     if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
     res.json(transaction);
+  });
+
+  router.get('/status', (req, res) => {
+    const month = req.query.month;
+    res.json(budgetService.getStatus(month));
+  });
+
+  router.get('/balances', (req, res) => {
+    const month = req.query.month;
+    res.json(budgetService.getBalances(month));
+  });
+
+  // Subscriptions (read — public)
+  router.get('/subscriptions', (req, res) => {
+    const month = req.query.month;
+    res.json({
+      month: month || new Date().toISOString().slice(0, 7),
+      summary: budgetService.getSubscriptionSummary(month),
+      sinkingFunds: budgetService.getSinkingFunds(month),
+      subscriptions: budgetService.getSubscriptions(month),
+    });
+  });
+
+  // Net worth (liquid cash position) trend
+  router.get('/networth', (req, res) => {
+    const limit = parseInt(req.query.limit || '12', 10);
+    res.json(budgetService.getNetworth(limit));
   });
 
   // Upcoming bills
@@ -90,6 +118,38 @@ module.exports = function (budgetService) {
     const removed = budgetService.deleteTransaction(req.params.id);
     if (!removed) return res.status(404).json({ error: 'Transaction not found' });
     res.json({ success: true });
+  });
+
+  router.patch('/status', requireAuth, (req, res) => {
+    const updated = budgetService.upsertStatus(req.body || {});
+    res.json(updated);
+  });
+
+  router.patch('/balances', requireAuth, (req, res) => {
+    const month = req.body && req.body.month;
+    const updated = budgetService.upsertBalances(month, req.body || {});
+    res.json(updated);
+  });
+
+  // Bulk-replace detected subscriptions for a month (agent sync)
+  router.put('/subscriptions', requireAuth, (req, res) => {
+    const month = req.body && req.body.month;
+    const items = (req.body && req.body.subscriptions) || [];
+    const created = budgetService.replaceSubscriptions(month, items);
+    res.json({ month: month || new Date().toISOString().slice(0, 7), count: created.length });
+  });
+
+  // Bulk-replace auto-derived bills (agent sync)
+  router.put('/bills', requireAuth, (req, res) => {
+    const items = (req.body && req.body.bills) || [];
+    const rows = budgetService.replaceBills(items);
+    res.json({ count: rows.length });
+  });
+
+  // Record a net-worth snapshot for a month (agent sync)
+  router.put('/networth', requireAuth, (req, res) => {
+    const saved = budgetService.recordNetworth(req.body || {});
+    res.json(saved);
   });
 
   return router;
